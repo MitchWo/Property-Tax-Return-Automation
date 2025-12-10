@@ -71,6 +71,27 @@ class Settings(BaseSettings):
         description="Allowed MIME types"
     )
 
+    # Pinecone Configuration
+    PINECONE_API_KEY: str = Field(default="", description="Pinecone API key")
+    PINECONE_INDEX_HOST: str = Field(
+        default="",
+        description="Pinecone index host URL (e.g., phase1-feedback-xxxxx.svc.aped-4627-b74a.pinecone.io)"
+    )
+    PINECONE_NAMESPACE: str = Field(
+        default="document-review",
+        description="Pinecone namespace for knowledge storage"
+    )
+
+    # Knowledge Retrieval
+    KNOWLEDGE_TOP_K: int = Field(
+        default=5,
+        description="Number of relevant learnings to retrieve"
+    )
+    KNOWLEDGE_RELEVANCE_THRESHOLD: float = Field(
+        default=0.3,
+        description="Minimum relevance score for knowledge retrieval"
+    )
+
     @field_validator("UPLOAD_DIR", mode="before")
     @classmethod
     def ensure_upload_dir(cls, v: str | Path) -> Path:

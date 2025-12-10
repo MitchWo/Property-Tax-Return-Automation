@@ -29,6 +29,7 @@ psycopg2-binary = "^2.9.11"
 openpyxl = "^3.1.5"
 pandas = "^2.3.3"
 xlrd = "^2.0.2"
+pinecone = "^8.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"
