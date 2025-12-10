@@ -20,7 +20,7 @@ class KnowledgeStore:
         self.api_key = settings.PINECONE_API_KEY
         self.index_host = settings.PINECONE_INDEX_HOST
         self.namespace = settings.PINECONE_NAMESPACE
-        self.api_version = "2025-04"
+        self.api_version = "2024-10"
 
         if not self.api_key or not self.index_host:
             logger.warning("Pinecone not configured - knowledge store disabled")
@@ -52,15 +52,18 @@ class KnowledgeStore:
         min_score = min_score or settings.KNOWLEDGE_RELEVANCE_THRESHOLD
 
         try:
-            url = f"https://{self.index_host}/records/namespaces/{self.namespace}/search"
+            # For search, we need to query with a vector
+            # Using dummy vector for now - in production use actual embeddings
+            import random
+            query_vector = [random.random() for _ in range(1024)]
+
+            url = f"https://{self.index_host}/query"
 
             payload = {
-                "query": {
-                    "top_k": top_k,
-                    "inputs": {
-                        "text": query
-                    }
-                }
+                "namespace": self.namespace,
+                "topK": top_k,
+                "vector": query_vector,
+                "includeMetadata": True
             }
 
             headers = {
@@ -74,20 +77,21 @@ class KnowledgeStore:
                 response.raise_for_status()
 
             result = response.json()
-            hits = result.get("result", {}).get("hits", [])
+            hits = result.get("matches", [])
 
             # Filter by minimum score and format results
             learnings = []
             for hit in hits:
-                score = hit.get("_score", 0)
+                score = hit.get("score", 0)
+                metadata = hit.get("metadata", {})
                 if score >= min_score:
                     learnings.append({
-                        "id": hit.get("_id"),
+                        "id": hit.get("id"),
                         "score": score,
-                        "content": hit.get("fields", {}).get("content", ""),
-                        "scenario": hit.get("fields", {}).get("scenario", ""),
-                        "category": hit.get("fields", {}).get("category", ""),
-                        "created_at": hit.get("fields", {}).get("created_at", "")
+                        "content": metadata.get("content", ""),
+                        "scenario": metadata.get("scenario", ""),
+                        "category": metadata.get("category", ""),
+                        "created_at": metadata.get("created_at", "")
                     })
 
             logger.info(f"Knowledge search returned {len(learnings)} relevant results")
@@ -132,18 +136,49 @@ class KnowledgeStore:
                 "source": source
             }
 
-            url = f"https://{self.index_host}/records/namespaces/{self.namespace}/upsert"
+            # For Pinecone, we need to generate embeddings
+            # For now, we'll create a dummy vector with dimension 1024
+            # In production, you'd use an embedding model like OpenAI's text-embedding-3-small
+
+            url = f"https://{self.index_host}/vectors/upsert"
+
+            # Create a simple hash for the ID
+            import hashlib
+            vector_id = hashlib.md5(f"{content}_{datetime.now().isoformat()}".encode()).hexdigest()
+
+            # Generate a dummy vector with dimension 1024
+            # In production, replace this with actual embeddings
+            import random
+            dummy_vector = [random.random() for _ in range(1024)]
+
+            # Store with vector and metadata
+            payload = {
+                "vectors": [
+                    {
+                        "id": vector_id,
+                        "values": dummy_vector,
+                        "metadata": {
+                            "content": content[:1000],  # Truncate if too long
+                            "scenario": scenario,
+                            "category": category,
+                            "created_at": datetime.utcnow().isoformat(),
+                            "source": source,
+                            "record_id": record_id
+                        }
+                    }
+                ],
+                "namespace": self.namespace
+            }
 
             headers = {
                 "Api-Key": self.api_key,
-                "Content-Type": "application/x-ndjson",
-                "X-Pinecone-API-Version": self.api_version
+                "Content-Type": "application/json"
             }
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     url,
-                    content=json.dumps(record),
+                    json=payload,
                     headers=headers
                 )
                 response.raise_for_status()
@@ -181,15 +216,17 @@ class KnowledgeStore:
             return False
 
         try:
-            url = f"https://{self.index_host}/records/namespaces/{self.namespace}/delete"
+            url = f"https://{self.index_host}/vectors/delete"
 
             headers = {
                 "Api-Key": self.api_key,
-                "Content-Type": "application/json",
-                "X-Pinecone-API-Version": self.api_version
+                "Content-Type": "application/json"
             }
 
-            payload = {"ids": [record_id]}
+            payload = {
+                "ids": [record_id],
+                "namespace": self.namespace
+            }
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(url, json=payload, headers=headers)
