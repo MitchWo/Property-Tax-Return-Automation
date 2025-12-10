@@ -1,13 +1,13 @@
-"""Knowledge store service for RAG using Pinecone with OpenAI embeddings."""
+"""Knowledge store service for RAG using Pinecone."""
 import json
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
 import httpx
 
 from app.config import settings
-from app.services.embeddings import embeddings_service
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +27,6 @@ class KnowledgeStore:
             self.enabled = False
         else:
             self.enabled = True
-
-        # Check if OpenAI embeddings are available
-        self.use_openai_embeddings = embeddings_service.enabled
-        if self.use_openai_embeddings:
-            logger.info("Using OpenAI embeddings for semantic search")
-        else:
-            logger.info("Using random vectors (OpenAI not configured)")
 
     async def search(
         self,
@@ -59,17 +52,10 @@ class KnowledgeStore:
         min_score = min_score or settings.KNOWLEDGE_RELEVANCE_THRESHOLD
 
         try:
-            # Generate query embedding
-            if self.use_openai_embeddings:
-                query_vector = await embeddings_service.embed_text(query)
-                if not query_vector:
-                    logger.warning("Failed to generate query embedding, using random vector")
-                    import random
-                    query_vector = [random.random() for _ in range(1024)]
-            else:
-                # Use random vector as fallback
-                import random
-                query_vector = [random.random() for _ in range(1024)]
+            # For search, we need to query with a vector
+            # Using dummy vector for now - in production use actual embeddings
+            import random
+            query_vector = [random.random() for _ in range(1024)]
 
             url = f"https://{self.index_host}/query"
 
@@ -91,16 +77,16 @@ class KnowledgeStore:
                 response.raise_for_status()
 
             result = response.json()
-            matches = result.get("matches", [])
+            hits = result.get("matches", [])
 
             # Filter by minimum score and format results
             learnings = []
-            for match in matches:
-                score = match.get("score", 0)
-                metadata = match.get("metadata", {})
+            for hit in hits:
+                score = hit.get("score", 0)
+                metadata = hit.get("metadata", {})
                 if score >= min_score:
                     learnings.append({
-                        "id": match.get("id"),
+                        "id": hit.get("id"),
                         "score": score,
                         "content": metadata.get("content", ""),
                         "scenario": metadata.get("scenario", ""),
@@ -123,7 +109,7 @@ class KnowledgeStore:
         source: str = "user_feedback"
     ) -> Optional[str]:
         """
-        Store a new learning with OpenAI embedding.
+        Store a new learning.
 
         Args:
             content: The learning content
@@ -141,40 +127,44 @@ class KnowledgeStore:
         try:
             record_id = f"{source}_{int(datetime.now().timestamp() * 1000)}"
 
-            # Prepare metadata
-            metadata = {
-                "content": content[:1000],  # Truncate if too long
+            record = {
+                "_id": record_id,
+                "content": content,
                 "scenario": scenario.lower().replace(" ", "_"),
                 "category": category.lower().replace(" ", "_"),
                 "created_at": datetime.utcnow().isoformat(),
-                "source": source,
-                "record_id": record_id
+                "source": source
             }
 
-            # Generate embedding
-            if self.use_openai_embeddings:
-                vector = await embeddings_service.embed_text(content)
-                if not vector:
-                    logger.warning("Failed to generate embedding, using random vector")
-                    import random
-                    vector = [random.random() for _ in range(1024)]
-            else:
-                # Use random vector as fallback
-                import random
-                vector = [random.random() for _ in range(1024)]
+            # For Pinecone, we need to generate embeddings
+            # For now, we'll create a dummy vector with dimension 1024
+            # In production, you'd use an embedding model like OpenAI's text-embedding-3-small
+
+            url = f"https://{self.index_host}/vectors/upsert"
 
             # Create a simple hash for the ID
             import hashlib
             vector_id = hashlib.md5(f"{content}_{datetime.now().isoformat()}".encode()).hexdigest()
 
-            url = f"https://{self.index_host}/vectors/upsert"
+            # Generate a dummy vector with dimension 1024
+            # In production, replace this with actual embeddings
+            import random
+            dummy_vector = [random.random() for _ in range(1024)]
 
+            # Store with vector and metadata
             payload = {
                 "vectors": [
                     {
                         "id": vector_id,
-                        "values": vector,
-                        "metadata": metadata
+                        "values": dummy_vector,
+                        "metadata": {
+                            "content": content[:1000],  # Truncate if too long
+                            "scenario": scenario,
+                            "category": category,
+                            "created_at": datetime.utcnow().isoformat(),
+                            "source": source,
+                            "record_id": record_id
+                        }
                     }
                 ],
                 "namespace": self.namespace

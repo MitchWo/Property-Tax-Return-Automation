@@ -92,6 +92,17 @@ class Settings(BaseSettings):
         description="Minimum relevance score for knowledge retrieval"
     )
 
+    # OpenAI Configuration (for embeddings)
+    OPENAI_API_KEY: str = Field(default="", description="OpenAI API key for embeddings")
+    EMBEDDING_MODEL: str = Field(
+        default="text-embedding-3-small",
+        description="OpenAI embedding model to use"
+    )
+    EMBEDDING_DIMENSIONS: int = Field(
+        default=1024,
+        description="Embedding dimensions (must match Pinecone index)"
+    )
+
     @field_validator("UPLOAD_DIR", mode="before")
     @classmethod
     def ensure_upload_dir(cls, v: str | Path) -> Path:

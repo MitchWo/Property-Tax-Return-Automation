@@ -19,7 +19,14 @@ from app.schemas.documents import (
     TaxReturnResponse,
     TaxReturnReview,
 )
+from app.schemas.feedback import (
+    FeedbackCreate,
+    FeedbackResponse,
+    LearningItem,
+    LearningsListResponse,
+)
 from app.services.document_processor import DocumentProcessor
+from app.services.knowledge_store import knowledge_store
 
 logger = logging.getLogger(__name__)
 
@@ -261,3 +268,221 @@ async def show_result(
             "review": review_data
         }
     )
+
+
+# === Feedback/Learning Routes ===
+
+@api_router.post("/feedback", response_model=FeedbackResponse)
+async def submit_feedback(feedback: FeedbackCreate):
+    """
+    Submit feedback or correction to improve the system.
+
+    Categories:
+    - document_classification: How documents should be classified
+    - document_validation: Rules for validating document content
+    - expense_classification: How expenses should be categorized
+    - blocking_rules: When to block processing
+    - general_guidance: General best practices
+    """
+    from datetime import datetime
+
+    try:
+        record_id = await knowledge_store.store(
+            content=feedback.content,
+            scenario=feedback.scenario,
+            category=feedback.category,
+            source="user_feedback"
+        )
+
+        if not record_id:
+            raise HTTPException(
+                status_code=503,
+                detail="Knowledge store unavailable - check Pinecone configuration"
+            )
+
+        return FeedbackResponse(
+            id=record_id,
+            content=feedback.content,
+            scenario=feedback.scenario,
+            category=feedback.category,
+            stored_at=datetime.utcnow(),
+            message="Feedback stored successfully. This will improve future document reviews."
+        )
+
+    except Exception as e:
+        logger.error(f"Error storing feedback: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/learnings", response_model=LearningsListResponse)
+async def list_learnings(
+    query: Optional[str] = None,
+    limit: int = 20
+):
+    """
+    List or search stored learnings.
+
+    If query is provided, returns semantically similar learnings.
+    Otherwise returns recent learnings.
+    """
+    try:
+        if query:
+            learnings = await knowledge_store.search(query, top_k=limit, min_score=0.0)
+        else:
+            learnings = await knowledge_store.list_learnings(limit=limit)
+
+        items = [
+            LearningItem(
+                id=l["id"],
+                content=l["content"],
+                scenario=l["scenario"],
+                category=l["category"],
+                score=l.get("score", 0.0),
+                created_at=l.get("created_at")
+            )
+            for l in learnings
+        ]
+
+        return LearningsListResponse(
+            total=len(items),
+            learnings=items
+        )
+
+    except Exception as e:
+        logger.error(f"Error listing learnings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/learnings/{learning_id}")
+async def delete_learning(learning_id: str):
+    """Delete a learning by ID."""
+    try:
+        success = await knowledge_store.delete(learning_id)
+
+        if not success:
+            raise HTTPException(status_code=404, detail="Learning not found or delete failed")
+
+        return {"message": "Learning deleted successfully", "id": learning_id}
+
+    except Exception as e:
+        logger.error(f"Error deleting learning: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/knowledge/status")
+async def knowledge_status():
+    """Check knowledge store and embeddings status."""
+    from app.services.embeddings import embeddings_service
+
+    return {
+        "pinecone": {
+            "enabled": knowledge_store.enabled,
+            "index_host": knowledge_store.index_host if knowledge_store.enabled else None,
+            "namespace": knowledge_store.namespace if knowledge_store.enabled else None
+        },
+        "embeddings": {
+            "enabled": embeddings_service.enabled,
+            "model": embeddings_service.model if embeddings_service.enabled else None,
+            "dimensions": embeddings_service.dimensions if embeddings_service.enabled else None,
+            "provider": "openai" if embeddings_service.enabled else "random_vectors"
+        }
+    }
+
+
+# === Web Routes for Feedback UI ===
+
+@web_router.get("/returns", response_class=HTMLResponse)
+async def returns_list_page(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """List all tax returns."""
+    result = await db.execute(
+        select(TaxReturn)
+        .options(selectinload(TaxReturn.client))
+        .order_by(TaxReturn.created_at.desc())
+        .limit(100)
+    )
+    returns = result.scalars().all()
+
+    return templates.TemplateResponse(
+        "returns.html",
+        {
+            "request": request,
+            "returns": returns
+        }
+    )
+
+
+@web_router.get("/feedback", response_class=HTMLResponse)
+async def feedback_page(request: Request):
+    """Feedback submission page."""
+    return templates.TemplateResponse("feedback.html", {"request": request})
+
+
+@web_router.post("/feedback")
+async def submit_feedback_web(
+    request: Request,
+    content: str = Form(...),
+    scenario: str = Form(...),
+    category: str = Form("general_guidance"),
+    tax_return_id: Optional[str] = Form(None)
+):
+    """Handle feedback form submission."""
+    try:
+        record_id = await knowledge_store.store(
+            content=content,
+            scenario=scenario,
+            category=category,
+            source="user_feedback"
+        )
+
+        return templates.TemplateResponse(
+            "feedback.html",
+            {
+                "request": request,
+                "success": True,
+                "message": f"Feedback stored successfully (ID: {record_id})"
+            }
+        )
+
+    except Exception as e:
+        return templates.TemplateResponse(
+            "feedback.html",
+            {
+                "request": request,
+                "error": str(e)
+            }
+        )
+
+
+@web_router.get("/learnings", response_class=HTMLResponse)
+async def learnings_page(
+    request: Request,
+    query: Optional[str] = None
+):
+    """View stored learnings."""
+    try:
+        if query:
+            learnings = await knowledge_store.search(query, top_k=50, min_score=0.0)
+        else:
+            learnings = await knowledge_store.list_learnings(limit=50)
+
+        return templates.TemplateResponse(
+            "learnings.html",
+            {
+                "request": request,
+                "learnings": learnings,
+                "query": query
+            }
+        )
+
+    except Exception as e:
+        return templates.TemplateResponse(
+            "learnings.html",
+            {
+                "request": request,
+                "error": str(e),
+                "learnings": []
+            }
+        )
