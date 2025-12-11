@@ -53,8 +53,12 @@ app.add_middleware(
 )
 
 # Include routers
+from app.api.transaction_routes import transaction_router, transaction_web_router
+
 app.include_router(api_router)
 app.include_router(web_router)
+app.include_router(transaction_router)
+app.include_router(transaction_web_router)
 
 # Mount static files if needed
 # app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -66,6 +70,17 @@ async def startup_event():
     logger.info("Starting Property Tax Agent application")
     await init_db()
     logger.info("Database initialized")
+
+    # Seed initial data for Phase 3
+    from app.services.seed_data import seed_all
+    from app.database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        try:
+            results = await seed_all(db)
+            logger.info(f"Seed data loaded: {results}")
+        except Exception as e:
+            logger.warning(f"Seed data may already exist: {e}")
 
 
 @app.on_event("shutdown")

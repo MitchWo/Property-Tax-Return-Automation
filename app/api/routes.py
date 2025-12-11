@@ -25,8 +25,8 @@ from app.schemas.feedback import (
     LearningItem,
     LearningsListResponse,
 )
-from app.services.document_processor import DocumentProcessor
-from app.services.knowledge_store import knowledge_store
+from app.services.phase1_document_intake.document_processor import DocumentProcessor
+from app.services.phase2_feedback_learning.knowledge_store import knowledge_store
 
 logger = logging.getLogger(__name__)
 
@@ -372,7 +372,7 @@ async def delete_learning(learning_id: str):
 @api_router.get("/knowledge/status")
 async def knowledge_status():
     """Check knowledge store and embeddings status."""
-    from app.services.embeddings import embeddings_service
+    from app.services.phase2_feedback_learning.embeddings import embeddings_service
 
     return {
         "pinecone": {

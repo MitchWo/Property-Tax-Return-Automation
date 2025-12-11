@@ -18,8 +18,8 @@ from app.schemas.documents import (
     TaxReturnCreate,
     TaxReturnReview,
 )
-from app.services.claude_client import ClaudeClient
-from app.services.file_handler import FileHandler
+from app.services.phase1_document_intake.claude_client import ClaudeClient
+from app.services.phase1_document_intake.file_handler import FileHandler
 
 logger = logging.getLogger(__name__)
 

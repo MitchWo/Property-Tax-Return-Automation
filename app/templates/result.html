@@ -164,10 +164,19 @@
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <button onclick="reportDocumentIssue('{{ doc.id }}', '{{ doc.original_filename }}', '{{ doc.document_type }}')"
-                                    class="text-yellow-600 hover:text-yellow-800 text-xs">
-                                Report Issue
-                            </button>
+                            <div class="flex items-center space-x-2">
+                                {% if doc.document_type in ['bank_statement', 'loan_statement', 'property_manager_statement'] and doc.status.value == 'classified' %}
+                                <button onclick="processTransactions('{{ doc.id }}', '{{ tax_return.id }}')"
+                                        class="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                                        id="process-btn-{{ doc.id }}">
+                                    Process Transactions
+                                </button>
+                                {% endif %}
+                                <button onclick="reportDocumentIssue('{{ doc.id }}', '{{ doc.original_filename }}', '{{ doc.document_type }}')"
+                                        class="text-yellow-600 hover:text-yellow-800 text-xs">
+                                    Report Issue
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -248,9 +257,39 @@
             </a>
         </div>
 
-        <button onclick="window.print()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-            Print Report
-        </button>
+        <div class="flex space-x-3" x-data="{ processing: false, processed: false, result: null }">
+            <!-- Process All Transactions Button -->
+            <button
+                x-show="!processed"
+                @click="processAllTransactions('{{ tax_return.id }}')"
+                :disabled="processing"
+                class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                <span x-show="!processing">📊 Process All Transactions</span>
+                <span x-show="processing" class="flex items-center">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                </span>
+            </button>
+
+            <!-- Success Message -->
+            <div x-show="processed && result" class="flex items-center text-green-600">
+                <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <span x-text="`Processed! ${result?.total_transactions || 0} transactions found`"></span>
+            </div>
+
+            <a href="/transactions/{{ tax_return.id }}"
+               class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                View Transactions →
+            </a>
+            <button onclick="window.print()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Print Report
+            </button>
+        </div>
     </div>
 </div>
 
@@ -337,6 +376,135 @@
 
 {% block scripts %}
 <script>
+async function processTransactions(documentId, taxReturnId) {
+    const button = document.getElementById(`process-btn-${documentId}`);
+    const originalText = button.textContent;
+
+    try {
+        // Update button state
+        button.textContent = 'Processing...';
+        button.disabled = true;
+        button.classList.add('opacity-50', 'cursor-not-allowed');
+
+        // Call the processing API
+        const params = new URLSearchParams({
+            document_id: documentId,
+            tax_return_id: taxReturnId,
+            force_reprocess: false
+        });
+
+        const response = await fetch(`/api/transactions/process/document?${params}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Show success message
+            showToast(`✓ Successfully processed ${result.transactions.length} transactions`, 'success');
+
+            // Update button to show completion
+            button.textContent = 'Processed ✓';
+            button.classList.remove('text-blue-600', 'hover:text-blue-800');
+            button.classList.add('text-green-600');
+
+            // Add link to view transactions
+            setTimeout(() => {
+                window.location.href = `/transactions/${taxReturnId}`;
+            }, 2000);
+        } else {
+            throw new Error(result.message || 'Processing failed');
+        }
+    } catch (error) {
+        console.error('Error processing transactions:', error);
+        showToast(`Error: ${error.message}`, 'error');
+
+        // Restore button
+        button.textContent = originalText;
+        button.disabled = false;
+        button.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+}
+
+async function processAllTransactions(taxReturnId) {
+    const button = event.target;
+    const originalHtml = button.innerHTML;
+
+    try {
+        // Update button state
+        button.innerHTML = '<span class="animate-pulse">🔄 Processing all documents...</span>';
+        button.disabled = true;
+        button.classList.add('opacity-50', 'cursor-not-allowed');
+
+        // Call the API to process all transactions
+        const response = await fetch(`/api/transactions/process/${taxReturnId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Show success message
+            showToast(
+                `✓ Processed ${result.total_transactions} transactions from ${result.documents_processed.length} documents. ` +
+                `${result.transactions_categorized} categorized, ${result.transactions_needing_review} need review.`,
+                'success'
+            );
+
+            // Update button to show completion
+            button.innerHTML = '<span>✅ All Transactions Processed</span>';
+            button.classList.remove('bg-purple-600', 'hover:bg-purple-700');
+            button.classList.add('bg-green-600');
+
+            // Optionally redirect to transactions view after a delay
+            if (result.total_transactions > 0) {
+                setTimeout(() => {
+                    window.location.href = `/transactions/${taxReturnId}`;
+                }, 3000);
+            }
+        } else {
+            throw new Error(result.message || 'Processing failed');
+        }
+    } catch (error) {
+        console.error('Error processing all transactions:', error);
+        showToast(`Error: ${error.message}`, 'error');
+
+        // Restore button
+        button.innerHTML = originalHtml;
+        button.disabled = false;
+        button.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+}
+
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toastMessage');
+    const toastDiv = toast.querySelector('div');
+
+    toastMessage.textContent = message;
+
+    // Update toast styling based on type
+    if (type === 'error') {
+        toastDiv.classList.remove('bg-green-500');
+        toastDiv.classList.add('bg-red-500');
+    } else {
+        toastDiv.classList.remove('bg-red-500');
+        toastDiv.classList.add('bg-green-500');
+    }
+
+    toast.classList.remove('hidden');
+
+    setTimeout(() => {
+        toast.classList.add('hidden');
+    }, 5000);
+}
+
 function reportDocumentIssue(docId, filename, currentType) {
     document.getElementById('feedbackDocumentId').value = docId;
     document.getElementById('feedbackFilename').textContent = filename;

@@ -18,7 +18,7 @@ from app.schemas.documents import (
     DocumentSummary,
     TaxReturnReview,
 )
-from app.services.prompts import (
+from app.services.phase1_document_intake.prompts import (
     COMPLETENESS_REVIEW_PROMPT,
     DOCUMENT_CLASSIFICATION_PROMPT,
 )
@@ -340,3 +340,74 @@ Please review these documents for completeness and provide your assessment.
                 continue
 
         return image_data
+
+    async def extract_transactions_with_vision(
+        self,
+        prompt: str,
+        text_content: Optional[str],
+        image_data: Optional[List[Tuple[bytes, str]]]
+    ) -> Dict[str, Any]:
+        """
+        Extract transactions using vision capabilities.
+
+        Args:
+            prompt: Extraction prompt with instructions
+            text_content: Text content if available
+            image_data: List of (image_bytes, media_type) tuples
+
+        Returns:
+            Parsed JSON response with transactions
+        """
+        try:
+            content = self._build_message_content(text_content, image_data)
+
+            response = await self._call_with_retry(
+                lambda: self.client.messages.create(
+                    model=self.model,
+                    max_tokens=8192,
+                    temperature=0.1,
+                    system=prompt,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": content
+                        }
+                    ]
+                )
+            )
+
+            response_text = response.content[0].text
+
+            # Clean up JSON response
+            if "```json" in response_text:
+                response_text = response_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in response_text:
+                response_text = response_text.split("```")[1].split("```")[0].strip()
+
+            return json.loads(response_text)
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse Claude response: {e}")
+            return {"transactions": [], "warnings": ["Failed to parse extraction response"]}
+        except Exception as e:
+            logger.error(f"Transaction extraction error: {e}")
+            raise
+
+    async def extract_settlement_with_vision(
+        self,
+        prompt: str,
+        text_content: Optional[str],
+        image_data: Optional[List[Tuple[bytes, str]]]
+    ) -> Dict[str, Any]:
+        """
+        Extract settlement statement data using vision.
+
+        Args:
+            prompt: Settlement extraction prompt
+            text_content: Text content if available
+            image_data: List of (image_bytes, media_type) tuples
+
+        Returns:
+            Parsed JSON response with settlement data
+        """
+        return await self.extract_transactions_with_vision(prompt, text_content, image_data)

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from app.config import settings
-from app.services.embeddings import embeddings_service
+from app.services.phase2_feedback_learning.embeddings import embeddings_service
 
 logger = logging.getLogger(__name__)
 

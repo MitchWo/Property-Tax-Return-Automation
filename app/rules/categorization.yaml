@@ -1,0 +1,426 @@
+# =============================================================================
+# NZ Rental Property Transaction Categorization Rules
+# =============================================================================
+# These patterns are matched against transaction descriptions and other_party
+# fields to automatically categorize bank statement transactions.
+#
+# Pattern matching order:
+# 1. Exact payee match (highest confidence)
+# 2. Regex pattern match
+# 3. Keyword match (lowest confidence)
+# =============================================================================
+
+version: "1.0"
+last_updated: "2024-12-11"
+
+# =============================================================================
+# EXACT PAYEE MATCHES
+# These match the "other_party" field exactly (case-insensitive)
+# =============================================================================
+payees:
+  # Councils - Rates
+  "AUCKLAND COUNCIL":
+    category: rates
+    confidence: 0.98
+  "WELLINGTON CITY COUNCIL":
+    category: rates
+    confidence: 0.98
+  "CHRISTCHURCH CITY COUNCIL":
+    category: rates
+    confidence: 0.98
+  "HAMILTON CITY COUNCIL":
+    category: rates
+    confidence: 0.98
+  "TAURANGA CITY COUNCIL":
+    category: rates
+    confidence: 0.98
+  "DUNEDIN CITY COUNCIL":
+    category: rates
+    confidence: 0.98
+  "HUTT CITY COUNCIL":
+    category: rates
+    confidence: 0.98
+  "PORIRUA CITY COUNCIL":
+    category: rates
+    confidence: 0.98
+  "UPPER HUTT CITY COUNCIL":
+    category: rates
+    confidence: 0.98
+  "PALMERSTON NORTH CITY":
+    category: rates
+    confidence: 0.98
+  "NAPIER CITY COUNCIL":
+    category: rates
+    confidence: 0.98
+  "HASTINGS DISTRICT COUNCIL":
+    category: rates
+    confidence: 0.98
+  "ROTORUA LAKES COUNCIL":
+    category: rates
+    confidence: 0.98
+  "WHANGAREI DISTRICT COUNCIL":
+    category: rates
+    confidence: 0.98
+  "NEW PLYMOUTH DISTRICT":
+    category: rates
+    confidence: 0.98
+  "QUEENSTOWN LAKES DISTRICT":
+    category: rates
+    confidence: 0.98
+
+  # Water Providers
+  "WATERCARE":
+    category: water_rates
+    confidence: 0.98
+  "WATERCARE SERVICES":
+    category: water_rates
+    confidence: 0.98
+  "WELLINGTON WATER":
+    category: water_rates
+    confidence: 0.98
+  "CHRISTCHURCH CITY WATER":
+    category: water_rates
+    confidence: 0.98
+
+  # Property Managers
+  "QUINOVIC":
+    category: agent_fees
+    confidence: 0.95
+    notes: "May include repairs - check description"
+  "BARFOOT & THOMPSON":
+    category: agent_fees
+    confidence: 0.95
+  "HARCOURTS":
+    category: agent_fees
+    confidence: 0.95
+  "RAY WHITE":
+    category: agent_fees
+    confidence: 0.95
+  "LJ HOOKER":
+    category: agent_fees
+    confidence: 0.95
+  "BAYLEYS":
+    category: agent_fees
+    confidence: 0.95
+  "CROCKERS":
+    category: agent_fees
+    confidence: 0.95
+  "PROPERTY BROKERS":
+    category: agent_fees
+    confidence: 0.95
+  "LODGE CITY RENTALS":
+    category: agent_fees
+    confidence: 0.95
+  "MCGRATH":
+    category: agent_fees
+    confidence: 0.95
+
+  # Insurance Companies
+  "TOWER INSURANCE":
+    category: insurance
+    confidence: 0.95
+  "IAG":
+    category: insurance
+    confidence: 0.95
+  "STATE INSURANCE":
+    category: insurance
+    confidence: 0.95
+  "AMI INSURANCE":
+    category: insurance
+    confidence: 0.95
+  "AA INSURANCE":
+    category: insurance
+    confidence: 0.95
+  "VERO INSURANCE":
+    category: insurance
+    confidence: 0.95
+  "INITIO":
+    category: insurance
+    confidence: 0.95
+
+  # Utilities
+  "MERCURY ENERGY":
+    category: electricity
+    confidence: 0.95
+  "GENESIS ENERGY":
+    category: electricity
+    confidence: 0.95
+  "CONTACT ENERGY":
+    category: electricity
+    confidence: 0.95
+  "MERIDIAN ENERGY":
+    category: electricity
+    confidence: 0.95
+  "POWERSHOP":
+    category: electricity
+    confidence: 0.95
+  "FLICK ELECTRIC":
+    category: electricity
+    confidence: 0.95
+  "NOVA ENERGY":
+    category: electricity
+    confidence: 0.95
+  "TRUSTPOWER":
+    category: electricity
+    confidence: 0.95
+  "ELECTRIC KIWI":
+    category: electricity
+    confidence: 0.95
+
+
+# =============================================================================
+# REGEX PATTERNS
+# These are applied to the full transaction description
+# Patterns are case-insensitive by default
+# =============================================================================
+patterns:
+  # ----- INTEREST (Critical - must be accurate) -----
+  - pattern: "(?i)\\b(loan|mortgage|home loan).*interest\\b"
+    category: interest
+    confidence: 0.95
+    require:
+      transaction_type: expense
+    notes: "Interest charge on loan"
+
+  - pattern: "(?i)\\bdebit\\s*interest\\b"
+    category: interest
+    confidence: 0.95
+    require:
+      transaction_type: expense
+
+  - pattern: "(?i)\\binterest\\s*(charged|debit|expense)\\b"
+    category: interest
+    confidence: 0.95
+    require:
+      transaction_type: expense
+
+  - pattern: "(?i)\\bhousing\\s*nz.*interest\\b"
+    category: interest
+    confidence: 0.90
+    require:
+      transaction_type: expense
+
+  # Interest CREDIT (offset - should be flagged)
+  - pattern: "(?i)\\b(credit|cr)\\s*interest\\b"
+    category: interest
+    confidence: 0.90
+    flag_for_review: true
+    review_reason: "Interest credit - verify if offset account"
+
+  # ----- RATES -----
+  - pattern: "(?i)\\b(council|city|district)\\s*(rates?|levy)\\b"
+    category: rates
+    confidence: 0.92
+
+  - pattern: "(?i)\\brates\\s*(instalment|payment|notice)\\b"
+    category: rates
+    confidence: 0.90
+
+  # ----- WATER RATES -----
+  - pattern: "(?i)\\bwater\\s*(care|rates?|charges?|usage)\\b"
+    category: water_rates
+    confidence: 0.92
+
+  - pattern: "(?i)\\bwatercare\\b"
+    category: water_rates
+    confidence: 0.95
+
+  # ----- BODY CORPORATE -----
+  - pattern: "(?i)\\b(body\\s*corp|bc|strata)\\s*(levy|fee|contribution)\\b"
+    category: body_corporate
+    confidence: 0.92
+
+  - pattern: "(?i)\\bbody\\s*corporate\\b"
+    category: body_corporate
+    confidence: 0.90
+
+  - pattern: "(?i)\\bbc\\s*(levy|operat|reserve)\\b"
+    category: body_corporate
+    confidence: 0.88
+
+  # ----- INSURANCE -----
+  - pattern: "(?i)\\b(landlord|rental|property|investment)\\s*insurance\\b"
+    category: insurance
+    confidence: 0.92
+
+  - pattern: "(?i)\\binsurance\\s*(premium|renewal|policy)\\b"
+    category: insurance
+    confidence: 0.85
+    flag_for_review: true
+    review_reason: "Verify landlord vs personal insurance"
+
+  # ----- RENTAL INCOME -----
+  - pattern: "(?i)\\b(rent|rental)\\s*(payment|income|received|deposit)\\b"
+    category: rental_income
+    confidence: 0.85
+    require:
+      transaction_type: income
+    flag_for_review: true
+    review_reason: "Confirm this is rent (not bond)"
+
+  - pattern: "(?i)\\btenant\\s*(payment|deposit)\\b"
+    category: rental_income
+    confidence: 0.80
+    require:
+      transaction_type: income
+    flag_for_review: true
+    review_reason: "Could be bond - confirm with client"
+
+  # ----- BOND (NOT INCOME) -----
+  - pattern: "(?i)\\bbond\\s*(payment|lodg|refund|return)\\b"
+    category: bond
+    confidence: 0.90
+    flag_for_review: true
+    review_reason: "Bond is NOT income - confirm split if combined with rent"
+
+  - pattern: "(?i)\\b(tenancy|rental)\\s*bond\\b"
+    category: bond
+    confidence: 0.90
+    flag_for_review: true
+    review_reason: "Bond is NOT income"
+
+  # ----- PROPERTY MANAGEMENT -----
+  - pattern: "(?i)\\b(property|pm|letting)\\s*(management|manager|mgt|fee)\\b"
+    category: agent_fees
+    confidence: 0.90
+
+  - pattern: "(?i)\\bmanagement\\s*fee\\b"
+    category: agent_fees
+    confidence: 0.88
+
+  - pattern: "(?i)\\b(letting|leasing)\\s*fee\\b"
+    category: listing_fees
+    confidence: 0.88
+
+  # ----- REPAIRS & MAINTENANCE -----
+  - pattern: "(?i)\\b(repair|maintenance|maint|plumb|electri|handyman)\\b"
+    category: repairs_maintenance
+    confidence: 0.85
+
+  - pattern: "(?i)\\b(fix|fixing|replace|replacement)\\b"
+    category: repairs_maintenance
+    confidence: 0.75
+    flag_for_review: true
+    review_reason: "Verify repair vs capital improvement"
+
+  - pattern: "(?i)\\b(bunnings|mitre\\s*10|placemakers)\\b"
+    category: repairs_maintenance
+    confidence: 0.80
+    flag_for_review: true
+    review_reason: "Hardware store - confirm property related"
+
+  # ----- BANK FEES -----
+  - pattern: "(?i)\\b(bank|account|monthly)\\s*(fee|charge)\\b"
+    category: bank_fees
+    confidence: 0.92
+
+  - pattern: "(?i)\\beft\\s*(fee|charge)\\b"
+    category: bank_fees
+    confidence: 0.90
+
+  - pattern: "(?i)\\b(overdrawn|dishon|unarranged)\\s*fee\\b"
+    category: bank_fees
+    confidence: 0.90
+
+  # ----- GARDENING -----
+  - pattern: "(?i)\\b(garden|lawn|mow|landscap)\\b"
+    category: gardening
+    confidence: 0.85
+
+  - pattern: "(?i)\\b(crewcut|jims\\s*mowing|green\\s*acres)\\b"
+    category: gardening
+    confidence: 0.90
+
+  # ----- PEST CONTROL -----
+  - pattern: "(?i)\\b(pest|termite|rodent|insect)\\s*(control|treatment)\\b"
+    category: pest_control
+    confidence: 0.92
+
+  # ----- LEGAL -----
+  - pattern: "(?i)\\b(solicitor|lawyer|legal|convey)\\b"
+    category: legal_fees
+    confidence: 0.85
+
+  # ----- TRANSFERS (EXCLUDED) -----
+  - pattern: "(?i)\\b(transfer|tfr)\\s*(to|from|between)\\b"
+    category: transfer
+    confidence: 0.85
+
+  - pattern: "(?i)\\binternal\\s*transfer\\b"
+    category: transfer
+    confidence: 0.92
+
+  # ----- PRINCIPAL REPAYMENT (EXCLUDED) -----
+  - pattern: "(?i)\\b(principal|loan)\\s*(repay|reduction)\\b"
+    category: principal_repayment
+    confidence: 0.92
+
+  - pattern: "(?i)\\bmortgage\\s*payment\\b"
+    category: principal_repayment
+    confidence: 0.70
+    flag_for_review: true
+    review_reason: "Check if this includes interest component"
+
+
+# =============================================================================
+# KEYWORD MATCHES (Lower confidence - used as fallback)
+# =============================================================================
+keywords:
+  # Income keywords
+  rent:
+    category: rental_income
+    confidence: 0.60
+    require:
+      transaction_type: income
+    flag_for_review: true
+
+  # Expense keywords
+  council:
+    category: rates
+    confidence: 0.70
+
+  water:
+    category: water_rates
+    confidence: 0.65
+
+  insurance:
+    category: insurance
+    confidence: 0.60
+    flag_for_review: true
+
+  repair:
+    category: repairs_maintenance
+    confidence: 0.65
+
+  maintenance:
+    category: repairs_maintenance
+    confidence: 0.65
+
+  plumber:
+    category: repairs_maintenance
+    confidence: 0.80
+
+  electrician:
+    category: repairs_maintenance
+    confidence: 0.80
+
+
+# =============================================================================
+# AMOUNT-BASED RULES
+# Applied after category is determined to flag unusual amounts
+# =============================================================================
+amount_rules:
+  rental_income:
+    typical_range: [200, 2000]  # Weekly rent range
+    flag_if_outside: true
+    review_reason: "Unusual rent amount - verify"
+
+  rates:
+    typical_range: [100, 1500]  # Quarterly rates
+    flag_if_outside: true
+    review_reason: "Unusual rates amount - verify"
+
+  insurance:
+    typical_range: [300, 3000]  # Annual premium
+    flag_if_outside: true
+    review_reason: "Unusual insurance amount - verify"
