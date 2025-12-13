@@ -1,4 +1,5 @@
 """Claude AI client for document analysis."""
+
 import asyncio
 import base64
 import io
@@ -21,6 +22,7 @@ from app.schemas.documents import (
 from app.services.phase1_document_intake.prompts import (
     COMPLETENESS_REVIEW_PROMPT,
     DOCUMENT_CLASSIFICATION_PROMPT,
+    TRANSACTION_FLAGGING_RULES,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,7 +35,7 @@ class ClaudeClient:
         """Initialize Claude client with Claude Opus 4.5."""
         self.client = AsyncAnthropic(
             api_key=api_key or settings.ANTHROPIC_API_KEY,
-            timeout=httpx.Timeout(120.0, connect=10.0)
+            timeout=httpx.Timeout(120.0, connect=10.0),
         )
         # Use Claude Opus 4.5 for superior document analysis
         self.model = model or settings.CLAUDE_MODEL  # claude-opus-4-5-20251101
@@ -48,7 +50,7 @@ class ClaudeClient:
                 response = await create_func()
 
                 # Log token usage for monitoring
-                if hasattr(response, 'usage'):
+                if hasattr(response, "usage"):
                     logger.info(
                         f"Claude API call: {response.usage.input_tokens} input, "
                         f"{response.usage.output_tokens} output tokens"
@@ -58,7 +60,7 @@ class ClaudeClient:
 
             except RateLimitError as e:
                 last_error = e
-                wait_time = 2 ** attempt  # 1, 2, 4 seconds
+                wait_time = 2**attempt  # 1, 2, 4 seconds
                 logger.warning(
                     f"Rate limited, waiting {wait_time}s (attempt {attempt + 1}/{self.max_retries})"
                 )
@@ -80,7 +82,8 @@ class ClaudeClient:
         self,
         document_content: Optional[str],
         image_data: Optional[List[Tuple[bytes, str]]],
-        context: Dict[str, Any]
+        context: Dict[str, Any],
+        transaction_learnings: Optional[List[Dict[str, Any]]] = None,
     ) -> DocumentClassification:
         """
         Analyze a single document for classification and extraction.
@@ -89,6 +92,7 @@ class ClaudeClient:
             document_content: Text content of document (if available)
             image_data: List of (image_bytes, media_type) tuples
             context: Additional context (client info, property details)
+            transaction_learnings: List of past learnings from Pinecone to apply
 
         Returns:
             DocumentClassification with analysis results
@@ -99,10 +103,23 @@ class ClaudeClient:
 
             # Add context to prompt
             system_prompt = DOCUMENT_CLASSIFICATION_PROMPT.format(
+                client_name=context.get("client_name", ""),
                 property_address=context.get("property_address", ""),
                 tax_year=context.get("tax_year", ""),
-                property_type=context.get("property_type", "")
+                property_type=context.get("property_type", ""),
             )
+
+            # Include transaction flagging rules for all documents
+            # (Claude will apply them when it identifies financial documents)
+            include_transaction_analysis = context.get("include_transaction_analysis", True)
+            if include_transaction_analysis:
+                system_prompt = system_prompt + "\n\n" + TRANSACTION_FLAGGING_RULES
+
+            # Inject transaction learnings from past feedback
+            if transaction_learnings:
+                learnings_context = self._format_transaction_learnings(transaction_learnings)
+                if learnings_context:
+                    system_prompt = system_prompt + "\n\n" + learnings_context
 
             # Call Claude API with retry logic
             response = await self._call_with_retry(
@@ -111,12 +128,7 @@ class ClaudeClient:
                     max_tokens=4096,
                     temperature=0.1,  # Lower temperature for more deterministic classification
                     system=system_prompt,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": content
-                        }
-                    ]
+                    messages=[{"role": "user", "content": content}],
                 )
             )
 
@@ -142,7 +154,7 @@ class ClaudeClient:
                 confidence=0.0,
                 reasoning="Failed to parse classification response",
                 flags=["classification_error"],
-                key_details={}
+                key_details={},
             )
         except Exception as e:
             logger.error(f"Error analyzing document: {e}")
@@ -173,9 +185,7 @@ class ClaudeClient:
             raise
 
     async def review_all_documents(
-        self,
-        documents: List[DocumentSummary],
-        context: Dict[str, Any]
+        self, documents: List[DocumentSummary], context: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Final review of all documents for completeness.
@@ -213,12 +223,7 @@ Please review these documents for completeness and provide your assessment.
                     max_tokens=4096,
                     temperature=0.1,  # Lower temperature for consistent reviews
                     system=COMPLETENESS_REVIEW_PROMPT,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ]
+                    messages=[{"role": "user", "content": prompt}],
                 )
             )
 
@@ -238,9 +243,7 @@ Please review these documents for completeness and provide your assessment.
             raise
 
     def _build_message_content(
-        self,
-        text: Optional[str],
-        images: Optional[List[Tuple[bytes, str]]]
+        self, text: Optional[str], images: Optional[List[Tuple[bytes, str]]]
     ) -> List[Dict[str, Any]]:
         """Build message content for Claude API."""
         content = []
@@ -251,27 +254,19 @@ Please review these documents for completeness and provide your assessment.
                 # Convert image to base64
                 base64_data = base64.b64encode(img_data).decode()
 
-                content.append({
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": media_type,
-                        "data": base64_data
+                content.append(
+                    {
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": media_type, "data": base64_data},
                     }
-                })
+                )
 
         # Add text content if available
         if text:
-            content.append({
-                "type": "text",
-                "text": f"Document text content:\n{text}"
-            })
+            content.append({"type": "text", "text": f"Document text content:\n{text}"})
         elif not images:
             # If no content at all, add placeholder
-            content.append({
-                "type": "text",
-                "text": "No document content available for analysis."
-            })
+            content.append({"type": "text", "text": "No document content available for analysis."})
 
         return content
 
@@ -295,10 +290,59 @@ Please review these documents for completeness and provide your assessment.
 
         return "\n".join(lines)
 
-    async def prepare_image_data(
-        self,
-        image_paths: List[str]
-    ) -> List[Tuple[bytes, str]]:
+    def _format_transaction_learnings(self, learnings: List[Dict[str, Any]]) -> str:
+        """
+        Format transaction learnings for injection into Claude prompt.
+
+        Args:
+            learnings: List of learnings from Pinecone search
+
+        Returns:
+            Formatted string to append to system prompt
+        """
+        if not learnings:
+            return ""
+
+        # Filter for transaction-related learnings
+        transaction_learnings = [
+            learning
+            for learning in learnings
+            if learning.get("category") == "transaction_analysis"
+            or learning.get("scenario")
+            in ["legitimate_rental_vendor", "flagged_transaction_pattern"]
+            or "transaction" in learning.get("content", "").lower()
+        ]
+
+        if not transaction_learnings:
+            return ""
+
+        context = """
+IMPORTANT - APPLY THESE LEARNINGS FROM PAST FEEDBACK:
+
+The following transactions/vendors have been reviewed previously. Apply this knowledge when flagging transactions:
+
+"""
+        for i, learning in enumerate(transaction_learnings, 1):
+            content = learning.get("content", "")
+            scenario = learning.get("scenario", "unknown")
+            score = learning.get("score", 0)
+
+            # Only include reasonably relevant learnings
+            if score >= 0.3 or scenario in [
+                "legitimate_rental_vendor",
+                "flagged_transaction_pattern",
+            ]:
+                context += f"{i}. {content}\n\n"
+
+        context += """
+When you encounter similar transactions, apply these learnings:
+- If a transaction matches a "legitimate" learning, do NOT flag it
+- If a transaction matches a "flagged" learning, continue to flag it
+- Use these patterns to make better decisions about similar transactions
+"""
+        return context
+
+    async def prepare_image_data(self, image_paths: List[str]) -> List[Tuple[bytes, str]]:
         """
         Prepare image data for Claude API with improved format handling.
 
@@ -316,23 +360,19 @@ Please review these documents for completeness and provide your assessment.
 
                 # Determine initial media type
                 suffix = path.suffix.lower()
-                media_type_map = {
-                    ".png": "image/png",
-                    ".jpg": "image/jpeg",
-                    ".jpeg": "image/jpeg"
-                }
+                media_type_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
                 media_type = media_type_map.get(suffix, "image/png")
 
                 # Read and potentially resize image
                 with Image.open(path) as img:
                     # Convert to RGB if necessary (handles RGBA, P mode, etc.)
-                    if img.mode in ('RGBA', 'P', 'LA'):
+                    if img.mode in ("RGBA", "P", "LA"):
                         # Convert to RGB for JPEG format
-                        img = img.convert('RGB')
-                        output_format = 'JPEG'
-                        media_type = 'image/jpeg'
+                        img = img.convert("RGB")
+                        output_format = "JPEG"
+                        media_type = "image/jpeg"
                     else:
-                        output_format = img.format or 'PNG'
+                        output_format = img.format or "PNG"
 
                     # Resize if too large (Claude's recommended max: 1568x1568)
                     max_size = (1568, 1568)
@@ -342,10 +382,12 @@ Please review these documents for completeness and provide your assessment.
 
                     # Convert to bytes
                     img_byte_arr = io.BytesIO()
-                    save_format = 'JPEG' if output_format == 'JPEG' or media_type == 'image/jpeg' else 'PNG'
+                    save_format = (
+                        "JPEG" if output_format == "JPEG" or media_type == "image/jpeg" else "PNG"
+                    )
 
                     # Save with appropriate quality
-                    if save_format == 'JPEG':
+                    if save_format == "JPEG":
                         img.save(img_byte_arr, format=save_format, quality=85, optimize=True)
                     else:
                         img.save(img_byte_arr, format=save_format, optimize=True)
@@ -354,10 +396,14 @@ Please review these documents for completeness and provide your assessment.
 
                     # Check file size (Claude limit is ~5MB per image)
                     if len(img_bytes) > 5 * 1024 * 1024:
-                        logger.warning(f"Image {image_path} is {len(img_bytes) / 1024 / 1024:.1f}MB, may be too large")
+                        logger.warning(
+                            f"Image {image_path} is {len(img_bytes) / 1024 / 1024:.1f}MB, may be too large"
+                        )
 
                 image_data.append((img_bytes, media_type))
-                logger.debug(f"Prepared image {image_path}: {media_type}, {len(img_bytes) / 1024:.1f}KB")
+                logger.debug(
+                    f"Prepared image {image_path}: {media_type}, {len(img_bytes) / 1024:.1f}KB"
+                )
 
             except Exception as e:
                 logger.error(f"Error preparing image {image_path}: {e}")

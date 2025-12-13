@@ -1,6 +1,7 @@
 """Application configuration using pydantic-settings."""
+
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,7 +22,7 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/property_tax",
-        description="PostgreSQL connection URL"
+        description="PostgreSQL connection URL",
     )
 
     # File Upload Settings
@@ -35,8 +36,7 @@ class Settings(BaseSettings):
     # - claude-sonnet-4-20250514 (fast, good accuracy)
     # - claude-haiku-4-5-20251001 (fastest, lowest cost)
     CLAUDE_MODEL: str = Field(
-        default="claude-opus-4-5-20251101",
-        description="Claude model to use for document analysis"
+        default="claude-opus-4-5-20251101", description="Claude model to use for document analysis"
     )
 
     # Application Settings
@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     # Allowed file extensions
     ALLOWED_EXTENSIONS: List[str] = Field(
         default=[".pdf", ".png", ".jpg", ".jpeg", ".xlsx", ".xls", ".csv"],
-        description="Allowed file extensions"
+        description="Allowed file extensions",
     )
 
     # Allowed MIME types
@@ -66,41 +66,40 @@ class Settings(BaseSettings):
             "image/jpeg",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "application/vnd.ms-excel",
-            "text/csv"
+            "text/csv",
         ],
-        description="Allowed MIME types"
+        description="Allowed MIME types",
     )
 
     # Pinecone Configuration
     PINECONE_API_KEY: str = Field(default="", description="Pinecone API key")
     PINECONE_INDEX_HOST: str = Field(
         default="",
-        description="Pinecone index host URL (e.g., phase1-feedback-xxxxx.svc.aped-4627-b74a.pinecone.io)"
+        description="Pinecone index host URL (e.g., phase1-feedback-xxxxx.svc.aped-4627-b74a.pinecone.io)",
     )
     PINECONE_NAMESPACE: str = Field(
-        default="document-review",
-        description="Pinecone namespace for knowledge storage"
+        default="document-review", description="Pinecone namespace for knowledge storage"
     )
 
     # Knowledge Retrieval
-    KNOWLEDGE_TOP_K: int = Field(
-        default=5,
-        description="Number of relevant learnings to retrieve"
+    KNOWLEDGE_TOP_K: int = Field(default=5, description="Number of relevant learnings to retrieve")
+
+    # Google Maps API
+    GOOGLE_MAPS_API_KEY: str = Field(
+        default="",
+        description="Google Maps API key for address autocomplete (requires Places API enabled)",
     )
     KNOWLEDGE_RELEVANCE_THRESHOLD: float = Field(
-        default=0.3,
-        description="Minimum relevance score for knowledge retrieval"
+        default=0.3, description="Minimum relevance score for knowledge retrieval"
     )
 
     # OpenAI Configuration (for embeddings)
     OPENAI_API_KEY: str = Field(default="", description="OpenAI API key for embeddings")
     EMBEDDING_MODEL: str = Field(
-        default="text-embedding-3-small",
-        description="OpenAI embedding model to use"
+        default="text-embedding-3-small", description="OpenAI embedding model to use"
     )
     EMBEDDING_DIMENSIONS: int = Field(
-        default=1024,
-        description="Embedding dimensions (must match Pinecone index)"
+        default=1024, description="Embedding dimensions (must match Pinecone index)"
     )
 
     @field_validator("UPLOAD_DIR", mode="before")

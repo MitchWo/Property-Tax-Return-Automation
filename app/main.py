@@ -1,10 +1,10 @@
 """Main FastAPI application entry point."""
+
 import logging
 
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import api_router, web_router
 from app.config import settings
@@ -21,7 +21,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -40,7 +40,7 @@ app = FastAPI(
     title="NZ Property Tax Document Review",
     description="Document review system for NZ rental property tax returns",
     version="1.0.0",
-    debug=settings.DEBUG
+    debug=settings.DEBUG,
 )
 
 # Add CORS middleware
@@ -99,7 +99,7 @@ async def health_check():
         "status": "healthy",
         "service": "property-tax-agent",
         "model": settings.CLAUDE_MODEL,
-        "debug": settings.DEBUG
+        "debug": settings.DEBUG,
     }
 
 
@@ -111,5 +111,5 @@ if __name__ == "__main__":
         host=settings.HOST,
         port=settings.PORT,
         reload=settings.DEBUG,
-        log_level=settings.LOG_LEVEL.lower()
+        log_level=settings.LOG_LEVEL.lower(),
     )

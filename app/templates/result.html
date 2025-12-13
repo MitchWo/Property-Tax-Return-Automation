@@ -3,39 +3,100 @@
 {% block title %}Review Result - Property Tax{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto space-y-6">
+<div class="w-full space-y-6">
     <!-- Status Header -->
     <div class="bg-white shadow rounded-lg p-6">
         <div class="flex items-center justify-between">
             <div>
-                <h2 class="text-2xl font-bold text-gray-900">Tax Return Review Result</h2>
+                <h2 class="text-2xl font-bold text-primary">Tax Return Review Result</h2>
                 <p class="mt-1 text-sm text-gray-500">ID: {{ tax_return.id }}</p>
             </div>
 
             <!-- Status Badge -->
             {% if tax_return.status.value == "complete" %}
             <div class="px-4 py-2 bg-green-100 text-green-800 rounded-full font-medium">
-                ✓ COMPLETE
+                COMPLETE
             </div>
             {% elif tax_return.status.value == "blocked" %}
             <div class="px-4 py-2 bg-red-100 text-red-800 rounded-full font-medium">
-                ⚠ BLOCKED
+                BLOCKED
             </div>
             {% elif tax_return.status.value == "incomplete" %}
             <div class="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-full font-medium">
-                ⚠ INCOMPLETE
+                INCOMPLETE
             </div>
             {% else %}
             <div class="px-4 py-2 bg-gray-100 text-gray-800 rounded-full font-medium">
                 PENDING
             </div>
             {% endif %}
+            <!-- Add Documents Button -->
+            <button onclick="toggleAddDocuments()"
+                    class="inline-flex items-center px-4 py-2 border border-accent text-accent rounded-md hover:bg-rose-light font-medium text-sm">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add Documents
+            </button>
         </div>
+    </div>
+
+    <!-- Add Documents Section (Hidden by default) -->
+    <div id="addDocumentsSection" class="bg-white shadow rounded-lg p-6 hidden">
+        <h3 class="text-lg font-medium text-primary mb-4">Add Additional Documents</h3>
+
+        <form id="addDocumentsForm" action="/result/{{ tax_return.id }}/add-documents" method="POST" enctype="multipart/form-data">
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center"
+                 id="addDocsDropzone"
+                 ondragover="event.preventDefault(); this.classList.add('border-accent', 'bg-rose-light');"
+                 ondragleave="this.classList.remove('border-accent', 'bg-rose-light');"
+                 ondrop="event.preventDefault(); this.classList.remove('border-accent', 'bg-rose-light'); handleAddDocsDrop(event);">
+
+                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+
+                <div class="mt-4">
+                    <label for="additionalFiles" class="cursor-pointer">
+                        <span class="text-sm font-medium text-primary">Drop files here or click to browse</span>
+                        <input id="additionalFiles" name="files" type="file" multiple required
+                               accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv"
+                               class="sr-only" onchange="handleAddDocsFiles(this.files)">
+                    </label>
+                </div>
+
+                <p class="mt-2 text-xs text-gray-500">PDF, PNG, JPG, JPEG, XLSX, XLS, CSV up to 50MB each</p>
+            </div>
+
+            <!-- Selected Files Preview -->
+            <div id="addDocsFileList" class="mt-4 hidden">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Selected Files (<span id="addDocsFileCount">0</span>)</h4>
+                <ul id="addDocsFileListItems" class="divide-y divide-gray-200 border border-gray-200 rounded-md"></ul>
+            </div>
+
+            <div class="mt-4 flex justify-end space-x-3">
+                <button type="button" onclick="toggleAddDocuments()"
+                        class="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-sm font-medium">
+                    Cancel
+                </button>
+                <button type="submit" id="addDocsSubmitBtn"
+                        class="px-4 py-2 bg-accent text-white rounded-md hover:bg-accent-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span id="addDocsSubmitText">Upload & Analyze</span>
+                    <span id="addDocsSubmitLoading" class="hidden flex items-center">
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Processing...
+                    </span>
+                </button>
+            </div>
+        </form>
     </div>
 
     <!-- Client & Property Details -->
     <div class="bg-white shadow rounded-lg p-6">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Property Details</h3>
+        <h3 class="text-lg font-medium text-primary mb-4">Property Details</h3>
 
         <dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
             <div>
@@ -53,12 +114,26 @@
             <div>
                 <dt class="text-sm font-medium text-gray-500">Property Type</dt>
                 <dd class="mt-1 text-sm text-gray-900">
-                    {{ "New Build" if tax_return.property_type.value == "new_build" else "Existing Property" }}
+                    {% if tax_return.property_type.value == "new_build" %}
+                        New Build
+                    {% elif tax_return.property_type.value == "existing" %}
+                        Existing Property
+                    {% else %}
+                        <span class="text-yellow-600">Not Sure (User selected)</span>
+                    {% endif %}
                 </dd>
             </div>
             <div>
                 <dt class="text-sm font-medium text-gray-500">GST Registered</dt>
-                <dd class="mt-1 text-sm text-gray-900">{{ "Yes" if tax_return.gst_registered else "No" }}</dd>
+                <dd class="mt-1 text-sm text-gray-900">
+                    {% if tax_return.gst_registered is none %}
+                        <span class="text-yellow-600">Not Sure (User selected)</span>
+                    {% elif tax_return.gst_registered %}
+                        Yes
+                    {% else %}
+                        No
+                    {% endif %}
+                </dd>
             </div>
             <div>
                 <dt class="text-sm font-medium text-gray-500">Year of Ownership</dt>
@@ -67,10 +142,117 @@
         </dl>
     </div>
 
+    <!-- AI Property Type Suggestion (when user selected "Not Sure") -->
+    {% if tax_return.property_type.value == "not_sure" and review.property_type_suggestion %}
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 class="text-lg font-medium text-blue-900 mb-4">AI Property Type Suggestion</h3>
+
+        <div class="space-y-4">
+            <div class="flex items-center">
+                <span class="text-sm font-medium text-gray-700 mr-2">Suggested Type:</span>
+                <span class="px-3 py-1 rounded-full text-sm font-semibold
+                    {% if review.property_type_suggestion.suggested_type == 'new_build' %}
+                        bg-green-100 text-green-800
+                    {% else %}
+                        bg-blue-100 text-blue-800
+                    {% endif %}">
+                    {{ "New Build" if review.property_type_suggestion.suggested_type == "new_build" else "Existing Property" }}
+                </span>
+                {% if review.property_type_suggestion.confidence %}
+                <span class="ml-3 text-sm text-gray-500">
+                    ({{ "%.0f"|format(review.property_type_suggestion.confidence * 100) }}% confidence)
+                </span>
+                {% endif %}
+            </div>
+
+            {% if review.property_type_suggestion.reasoning %}
+            <div>
+                <span class="text-sm font-medium text-gray-700">Reasoning:</span>
+                <p class="mt-1 text-sm text-gray-600">{{ review.property_type_suggestion.reasoning }}</p>
+            </div>
+            {% endif %}
+
+            {% if review.property_type_suggestion.suggested_type == "new_build" %}
+            <div class="mt-2 p-3 bg-green-50 rounded-md">
+                <p class="text-sm text-green-800">
+                    <strong>Tax Benefit:</strong> As a new build, you may be eligible for <strong>100% interest deductibility</strong>
+                    (if CCC issued after 27 March 2020).
+                </p>
+            </div>
+            {% else %}
+            <div class="mt-2 p-3 bg-yellow-50 rounded-md">
+                <p class="text-sm text-yellow-800">
+                    <strong>Note:</strong> Existing properties are eligible for <strong>80% interest deductibility</strong>
+                    (2024/25 tax year).
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- AI GST Registration Suggestion (when user selected "Not Sure") -->
+    {% if tax_return.gst_registered is none and review.gst_suggestion %}
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 class="text-lg font-medium text-blue-900 mb-4">AI GST Registration Suggestion</h3>
+
+        <div class="space-y-4">
+            <div class="flex items-center">
+                <span class="text-sm font-medium text-gray-700 mr-2">Suggested Status:</span>
+                <span class="px-3 py-1 rounded-full text-sm font-semibold
+                    {% if review.gst_suggestion.suggested_status %}
+                        bg-green-100 text-green-800
+                    {% else %}
+                        bg-gray-100 text-gray-800
+                    {% endif %}">
+                    {{ "GST Registered" if review.gst_suggestion.suggested_status else "Not GST Registered" }}
+                </span>
+                {% if review.gst_suggestion.confidence %}
+                <span class="ml-3 text-sm text-gray-500">
+                    ({{ "%.0f"|format(review.gst_suggestion.confidence * 100) }}% confidence)
+                </span>
+                {% endif %}
+            </div>
+
+            {% if review.gst_suggestion.reasoning %}
+            <div>
+                <span class="text-sm font-medium text-gray-700">Reasoning:</span>
+                <p class="mt-1 text-sm text-gray-600">{{ review.gst_suggestion.reasoning }}</p>
+            </div>
+            {% endif %}
+
+            {% if review.gst_suggestion.evidence %}
+            <div>
+                <span class="text-sm font-medium text-gray-700">Evidence:</span>
+                <ul class="mt-1 text-sm text-gray-600 list-disc list-inside">
+                    {% for item in review.gst_suggestion.evidence %}
+                    <li>{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if review.gst_suggestion.suggested_status %}
+            <div class="mt-2 p-3 bg-green-50 rounded-md">
+                <p class="text-sm text-green-800">
+                    <strong>Note:</strong> If GST registered, you can claim GST on expenses and must charge GST on rent. More complex accounting requirements apply.
+                </p>
+            </div>
+            {% else %}
+            <div class="mt-2 p-3 bg-gray-50 rounded-md">
+                <p class="text-sm text-gray-700">
+                    <strong>Note:</strong> Most small residential rental properties are not GST registered. Simpler accounting, no GST claims or charges.
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Blocking Issues (if any) -->
     {% if review.blocking_issues %}
     <div class="bg-red-50 border border-red-200 rounded-lg p-6">
-        <h3 class="text-lg font-medium text-red-900 mb-4">⚠ Blocking Issues</h3>
+        <h3 class="text-lg font-medium text-red-900 mb-4">Blocking Issues</h3>
         <ul class="space-y-2">
             {% for issue in review.blocking_issues %}
             <li class="flex items-start">
@@ -82,85 +264,385 @@
     </div>
     {% endif %}
 
-    <!-- Documents Table -->
-    <div class="bg-white shadow rounded-lg overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-medium text-gray-900">Processed Documents ({{ documents|length }})</h3>
-            <p class="text-sm text-gray-500 mt-1">Click "Report Issue" if a document was incorrectly classified</p>
+    <!-- Duplicate Files Warning -->
+    {% set duplicate_docs = documents | selectattr('is_duplicate') | list %}
+    {% if duplicate_docs | length > 0 %}
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+        <h3 class="text-lg font-medium text-yellow-900 mb-4">Duplicate Files Detected ({{ duplicate_docs | length }})</h3>
+        <p class="text-sm text-yellow-700 mb-3">
+            The following files were identified as duplicates and were not re-analyzed to save processing time.
+            Classification was copied from the original document.
+        </p>
+        <ul class="space-y-2">
+            {% for doc in duplicate_docs %}
+            <li class="flex items-start">
+                <span class="text-yellow-600 mr-2">•</span>
+                <span class="text-yellow-800">
+                    <strong>{{ doc.original_filename }}</strong>
+                    {% if doc.extracted_data and doc.extracted_data.duplicate_info %}
+                    → duplicate of "{{ doc.extracted_data.duplicate_info.original_filename }}"
+                    ({{ doc.extracted_data.duplicate_info.type }})
+                    {% endif %}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <!-- Flagged Transactions Section -->
+    {% if review.flagged_transactions_summary and review.flagged_transactions_summary.total_flagged > 0 %}
+    <div class="bg-white border border-orange-200 rounded-lg shadow-sm overflow-hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-orange-50 to-amber-50 px-6 py-4 border-b border-orange-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-orange-100 rounded-lg">
+                        <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">
+                            Transactions to Review
+                        </h3>
+                        <p class="text-sm text-gray-600">{{ review.flagged_transactions_summary.total_flagged }} transaction{{ 's' if review.flagged_transactions_summary.total_flagged > 1 else '' }} requiring attention</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    {% if review.flagged_transactions_summary.critical_count > 0 %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                        {{ review.flagged_transactions_summary.critical_count }} Critical
+                    </span>
+                    {% endif %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                        <span id="reconciledCount">0</span>/{{ review.flagged_transactions_summary.total_flagged }} Reconciled
+                    </span>
+                </div>
+            </div>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Filename
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Detected Type
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Confidence
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Key Details
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                        </th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for doc in documents %}
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {{ doc.original_filename }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            {% if doc.document_type %}
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                       {% if doc.document_type == 'invalid' %}bg-red-100 text-red-800
-                                       {% elif doc.document_type == 'other' %}bg-gray-100 text-gray-800
-                                       {% elif doc.document_type == 'error' %}bg-red-100 text-red-800
-                                       {% else %}bg-green-100 text-green-800{% endif %}">
-                                {{ doc.document_type }}
-                            </span>
-                            {% else %}
-                            <span class="text-gray-400">-</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {% if doc.classification_confidence %}
-                            <span class="{% if doc.classification_confidence < 0.7 %}text-yellow-600{% else %}text-green-600{% endif %}">
-                                {{ "%.1f"|format(doc.classification_confidence * 100) }}%
-                            </span>
-                            {% else %}
-                            -
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                       {% if doc.status.value == 'classified' %}bg-blue-100 text-blue-800
-                                       {% elif doc.status.value == 'error' %}bg-red-100 text-red-800
-                                       {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                {{ doc.status.value }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 text-sm text-gray-500">
-                            {% if doc.extracted_data and doc.extracted_data.key_details %}
-                            <details class="cursor-pointer">
-                                <summary>View Details</summary>
-                                <div class="mt-2 text-xs">
+        <!-- Transaction Cards -->
+        <div class="divide-y divide-gray-100">
+            {% for txn in review.flagged_transactions_summary.transactions_requiring_invoices %}
+            <div class="p-4 hover:bg-gray-50 transition-colors transaction-row" data-txn-key="{{ txn.document }}:{{ txn.transaction }}:{{ txn.amount }}">
+                <div class="flex items-start gap-4">
+                    <!-- Amount Badge -->
+                    <div class="flex-shrink-0 w-24 text-center">
+                        <div class="text-lg font-bold text-gray-900">${{ "%.2f"|format(txn.amount) }}</div>
+                        <div class="text-xs text-gray-500 mt-0.5">{{ txn.document[:20] }}{% if txn.document|length > 20 %}...{% endif %}</div>
+                    </div>
+
+                    <!-- Transaction Details -->
+                    <div class="flex-grow min-w-0">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0 flex-grow">
+                                <p class="text-sm font-medium text-gray-900 truncate" title="{{ txn.transaction }}">
+                                    {{ txn.transaction }}
+                                </p>
+                                <div class="mt-1 flex items-center gap-2 flex-wrap">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                                        {% if 'cash' in txn.reason %}bg-red-100 text-red-700
+                                        {% elif 'unusual_vendor' in txn.reason %}bg-red-100 text-red-700
+                                        {% elif 'large_payment' in txn.reason %}bg-amber-100 text-amber-700
+                                        {% elif 'unclear' in txn.reason %}bg-purple-100 text-purple-700
+                                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                        {% if 'cash' in txn.reason %}
+                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                                        {% elif 'large_payment' in txn.reason %}
+                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                        {% else %}
+                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                        {% endif %}
+                                        {{ txn.reason|replace('_', ' ')|title }}
+                                    </span>
+                                    <span class="text-xs text-gray-500">{{ txn.action_required }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="flex-shrink-0 flex items-center gap-2 action-buttons">
+                                <button onclick="quickReconcile(this)"
+                                        data-transaction="{{ txn.transaction | e }}"
+                                        data-amount="{{ txn.amount }}"
+                                        data-document="{{ txn.document | e }}"
+                                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                                        title="Mark as reviewed without saving feedback">
+                                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    OK
+                                </button>
+                                <button onclick="openTransactionFeedback(this)"
+                                        data-transaction="{{ txn.transaction | e }}"
+                                        data-amount="{{ txn.amount }}"
+                                        data-document="{{ txn.document | e }}"
+                                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-white bg-accent hover:bg-accent-700 transition-colors"
+                                        title="Categorize and save for AI learning">
+                                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                                    </svg>
+                                    Categorize
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if review.flagged_transactions_summary.recommendation %}
+        <!-- Recommendation Footer -->
+        <div class="px-6 py-4 bg-amber-50 border-t border-orange-200">
+            <div class="flex items-start gap-2">
+                <svg class="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-sm text-amber-800">
+                    <span class="font-medium">Tip:</span> {{ review.flagged_transactions_summary.recommendation }}
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Quick Actions Legend -->
+        <div class="px-6 py-3 bg-gray-50 border-t border-gray-200">
+            <div class="flex items-center justify-between text-xs text-gray-500">
+                <div class="flex items-center gap-4">
+                    <span class="flex items-center gap-1">
+                        <span class="inline-block w-2 h-2 rounded-full bg-gray-300"></span>
+                        <strong>OK</strong> = One-off, no AI learning
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <span class="inline-block w-2 h-2 rounded-full bg-accent"></span>
+                        <strong>Categorize</strong> = Save for future AI improvement
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Processed Documents Section -->
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-blue-100 rounded-lg">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-primary">Processed Documents</h3>
+                        <p class="text-sm text-gray-600">{{ documents|length }} document{{ 's' if documents|length > 1 else '' }} analyzed</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    {% set success_count = documents|rejectattr('document_type', 'equalto', 'error')|rejectattr('document_type', 'equalto', 'invalid')|list|length %}
+                    {% set error_count = documents|selectattr('document_type', 'equalto', 'error')|list|length %}
+                    {% set invalid_count = documents|selectattr('document_type', 'equalto', 'invalid')|list|length %}
+
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        {{ success_count }} Success
+                    </span>
+                    {% if error_count > 0 %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                        </svg>
+                        {{ error_count }} Error
+                    </span>
+                    {% endif %}
+                    {% if invalid_count > 0 %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                        {{ invalid_count }} Invalid
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Document Cards -->
+        <div class="divide-y divide-gray-100">
+            {% for doc in documents %}
+            <div class="p-4 hover:bg-gray-50 transition-colors
+                {% if doc.document_type == 'error' %}bg-red-50
+                {% elif doc.document_type == 'invalid' %}bg-yellow-50
+                {% elif doc.is_duplicate %}bg-amber-50
+                {% endif %}">
+                <div class="flex items-start gap-4">
+                    <!-- Status Icon -->
+                    <div class="flex-shrink-0">
+                        {% if doc.document_type == 'error' %}
+                        <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        {% elif doc.document_type == 'invalid' %}
+                        <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                        </div>
+                        {% elif doc.is_duplicate %}
+                        <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        {% else %}
+                        <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Document Details -->
+                    <div class="flex-grow min-w-0">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0 flex-grow">
+                                <!-- Filename -->
+                                <p class="text-sm font-medium text-gray-900 truncate" title="{{ doc.original_filename }}">
+                                    {{ doc.original_filename }}
+                                </p>
+
+                                <!-- Tags Row -->
+                                <div class="mt-1.5 flex items-center gap-2 flex-wrap">
+                                    <!-- Document Type Badge -->
+                                    {% if doc.document_type %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                                        {% if doc.document_type == 'error' %}bg-red-100 text-red-700
+                                        {% elif doc.document_type == 'invalid' %}bg-yellow-100 text-yellow-700
+                                        {% elif doc.document_type == 'bank_statement' %}bg-blue-100 text-blue-700
+                                        {% elif doc.document_type == 'loan_statement' %}bg-purple-100 text-purple-700
+                                        {% elif doc.document_type == 'landlord_insurance' %}bg-green-100 text-green-700
+                                        {% elif doc.document_type == 'rates' or doc.document_type == 'water_rates' %}bg-teal-100 text-teal-700
+                                        {% elif doc.document_type == 'ccc' %}bg-indigo-100 text-indigo-700
+                                        {% elif doc.document_type == 'settlement_statement' %}bg-pink-100 text-pink-700
+                                        {% elif doc.document_type == 'property_manager_statement' %}bg-cyan-100 text-cyan-700
+                                        {% elif doc.document_type == 'maintenance_invoice' %}bg-orange-100 text-orange-700
+                                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                        {{ doc.document_type|replace('_', ' ')|title }}
+                                    </span>
+                                    {% endif %}
+
+                                    <!-- Confidence Badge -->
+                                    {% if doc.classification_confidence %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                                        {% if doc.classification_confidence >= 0.9 %}bg-green-50 text-green-700
+                                        {% elif doc.classification_confidence >= 0.7 %}bg-blue-50 text-blue-700
+                                        {% else %}bg-yellow-50 text-yellow-700{% endif %}">
+                                        {% if doc.classification_confidence >= 0.9 %}
+                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                                        {% endif %}
+                                        {{ "%.0f"|format(doc.classification_confidence * 100) }}% confident
+                                    </span>
+                                    {% endif %}
+
+                                    <!-- Duplicate Badge -->
+                                    {% if doc.is_duplicate %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2"></path></svg>
+                                        Duplicate
+                                    </span>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Key Details (only show inline if 3 or fewer, otherwise use collapsible) -->
+                                {% if doc.extracted_data and doc.extracted_data.key_details and doc.extracted_data.key_details|length <= 3 %}
+                                <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                                     {% for key, value in doc.extracted_data.key_details.items() %}
-                                    <div><strong>{{ key }}:</strong> {{ value }}</div>
+                                    {% if key not in ['flags', 'transaction_analysis', 'error'] and value %}
+                                    {% set str_value = value|string %}
+                                    <span><strong class="text-gray-600">{{ key|replace('_', ' ')|title }}:</strong> {{ str_value if str_value|length < 50 else str_value[:47] + '...' }}</span>
+                                    {% endif %}
                                     {% endfor %}
                                 </div>
-                            </details>
-                            {% else %}
-                            -
+                                {% endif %}
+
+                                <!-- Error Message -->
+                                {% if doc.document_type == 'error' and doc.extracted_data and doc.extracted_data.key_details %}
+                                <div class="mt-2 text-xs text-red-600">
+                                    {{ doc.extracted_data.key_details.get('error', 'Processing failed') }}
+                                </div>
+                                {% endif %}
+
+                                <!-- Duplicate Info -->
+                                {% if doc.is_duplicate and doc.extracted_data and doc.extracted_data.duplicate_info %}
+                                <div class="mt-2 text-xs text-amber-600">
+                                    Duplicate of: {{ doc.extracted_data.duplicate_info.original_filename }}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="flex-shrink-0 flex items-center gap-2">
+                                {% if doc.extracted_data and doc.extracted_data.key_details and doc.extracted_data.key_details|length > 3 %}
+                                <button onclick="toggleDocumentDetails('{{ doc.id }}')"
+                                        id="details-btn-{{ doc.id }}"
+                                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors">
+                                    <svg class="w-3.5 h-3.5 mr-1.5 transition-transform duration-200" id="details-icon-{{ doc.id }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                    <span id="details-text-{{ doc.id }}">Show Details</span>
+                                </button>
+                                {% endif %}
+                                <button onclick="reportDocumentIssue('{{ doc.id }}', '{{ doc.original_filename }}', '{{ doc.document_type }}')"
+                                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 transition-colors">
+                                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                    </svg>
+                                    Report Issue
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Collapsible Details Panel -->
+                        {% if doc.extracted_data and doc.extracted_data.key_details and doc.extracted_data.key_details|length > 3 %}
+                        <div id="details-panel-{{ doc.id }}" class="hidden mt-4 pt-4 border-t border-gray-200" style="display: none;">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {% for key, value in doc.extracted_data.key_details.items() %}
+                                {% if key not in ['flags', 'transaction_analysis'] and value %}
+                                <div class="bg-gray-50 rounded-lg p-3">
+                                    <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ key|replace('_', ' ') }}</dt>
+                                    <dd class="mt-1 text-sm text-gray-900">
+                                        {% set str_val = value|string %}
+                                        {% if str_val|length > 100 %}
+                                        {{ str_val[:100] }}...
+                                        {% else %}
+                                        {{ str_val }}
+                                        {% endif %}
+                                    </dd>
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% if doc.extracted_data.flags %}
+                            <div class="mt-3 pt-3 border-t border-gray-100">
+                                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Flags</dt>
+                                <div class="flex flex-wrap gap-1">
+                                    {% for flag in doc.extracted_data.flags %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+                                        {{ flag|replace('_', ' ')|title }}
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                            </div>
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
@@ -224,32 +706,153 @@
     {% endif %}
 
     <!-- Summary -->
-    {% if review.summary %}
-    <div class="bg-gray-50 rounded-lg p-6">
-        <h3 class="text-lg font-medium text-gray-900 mb-2">Review Summary</h3>
-        <p class="text-gray-700">{{ review.summary }}</p>
+    <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
+        <h3 class="text-lg font-medium text-primary mb-4">Review Summary</h3>
 
+        <!-- Overview Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg p-4 border border-gray-200">
+                <div class="text-2xl font-bold text-blue-600">{{ documents|length }}</div>
+                <div class="text-sm text-gray-500">Documents Processed</div>
+            </div>
+            <div class="bg-white rounded-lg p-4 border border-gray-200">
+                <div class="text-2xl font-bold text-green-600">
+                    {{ documents|selectattr('document_type')|rejectattr('document_type', 'equalto', 'error')|rejectattr('document_type', 'equalto', 'invalid')|list|length }}
+                </div>
+                <div class="text-sm text-gray-500">Successfully Classified</div>
+            </div>
+            <div class="bg-white rounded-lg p-4 border border-gray-200">
+                <div class="text-2xl font-bold text-orange-600">
+                    {{ review.flagged_transactions_summary.total_flagged if review.flagged_transactions_summary else 0 }}
+                </div>
+                <div class="text-sm text-gray-500">Flagged Transactions</div>
+            </div>
+            <div class="bg-white rounded-lg p-4 border border-gray-200">
+                <div class="text-2xl font-bold text-red-600">
+                    {{ review.blocking_issues|length if review.blocking_issues else 0 }}
+                </div>
+                <div class="text-sm text-gray-500">Blocking Issues</div>
+            </div>
+        </div>
+
+        <!-- Document Types Found -->
+        <div class="mb-6">
+            <h4 class="text-sm font-semibold text-gray-700 mb-2">Document Types Identified</h4>
+            <div class="flex flex-wrap gap-2">
+                {% set doc_types = documents|map(attribute='document_type')|select|list %}
+                {% set unique_types = doc_types|unique|list %}
+                {% for doc_type in unique_types %}
+                {% if doc_type and doc_type != 'error' %}
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium
+                    {% if doc_type == 'invalid' %}bg-red-100 text-red-800
+                    {% elif doc_type == 'bank_statement' %}bg-blue-100 text-blue-800
+                    {% elif doc_type == 'loan_statement' %}bg-purple-100 text-purple-800
+                    {% elif doc_type == 'landlord_insurance' %}bg-green-100 text-green-800
+                    {% elif doc_type == 'rates' %}bg-yellow-100 text-yellow-800
+                    {% elif doc_type == 'ccc' %}bg-teal-100 text-teal-800
+                    {% elif doc_type == 'settlement_statement' %}bg-indigo-100 text-indigo-800
+                    {% elif doc_type == 'property_manager_statement' %}bg-pink-100 text-pink-800
+                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                    {{ doc_type|replace('_', ' ')|title }}
+                    <span class="ml-1 text-xs opacity-75">({{ doc_types|select('equalto', doc_type)|list|length }})</span>
+                </span>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Interest Deductibility -->
+        {% if tax_return.property_type.value == "new_build" %}
+        <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <h4 class="text-sm font-semibold text-green-800 mb-1">Interest Deductibility</h4>
+            <p class="text-sm text-green-700">
+                <strong>100% Deductible</strong> - New build property (CCC verification required for dates after 27 March 2020)
+            </p>
+        </div>
+        {% elif tax_return.property_type.value == "existing" %}
+        <div class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <h4 class="text-sm font-semibold text-yellow-800 mb-1">Interest Deductibility</h4>
+            <p class="text-sm text-yellow-700">
+                <strong>80% Deductible</strong> - Existing property (2024/25 tax year rate)
+            </p>
+        </div>
+        {% endif %}
+
+        <!-- Completeness Score -->
         {% if review.completeness_score %}
-        <div class="mt-4">
+        <div class="mb-6">
+            <h4 class="text-sm font-semibold text-gray-700 mb-2">Completeness Score</h4>
             <div class="flex items-center">
-                <span class="text-sm font-medium text-gray-700 mr-2">Completeness Score:</span>
-                <div class="flex-1 bg-gray-200 rounded-full h-2.5 max-w-xs">
-                    <div class="bg-blue-600 h-2.5 rounded-full"
+                <div class="flex-1 bg-gray-200 rounded-full h-3 max-w-md">
+                    <div class="h-3 rounded-full transition-all duration-500
+                        {% if review.completeness_score >= 0.8 %}bg-green-500
+                        {% elif review.completeness_score >= 0.5 %}bg-yellow-500
+                        {% else %}bg-red-500{% endif %}"
                          style="width: {{ review.completeness_score * 100 }}%"></div>
                 </div>
-                <span class="ml-2 text-sm font-medium text-gray-700">
+                <span class="ml-3 text-lg font-bold
+                    {% if review.completeness_score >= 0.8 %}text-green-600
+                    {% elif review.completeness_score >= 0.5 %}text-yellow-600
+                    {% else %}text-red-600{% endif %}">
                     {{ "%.0f"|format(review.completeness_score * 100) }}%
                 </span>
             </div>
+            <p class="mt-1 text-xs text-gray-500">
+                {% if review.completeness_score >= 0.8 %}
+                Excellent - Most required documents are present
+                {% elif review.completeness_score >= 0.5 %}
+                Moderate - Some important documents may be missing
+                {% else %}
+                Low - Several critical documents are missing
+                {% endif %}
+            </p>
         </div>
         {% endif %}
+
+        <!-- AI Summary -->
+        {% if review.summary %}
+        <div class="border-t border-gray-200 pt-4">
+            <h4 class="text-sm font-semibold text-primary mb-2">AI Analysis Summary</h4>
+            <p class="text-sm text-gray-600 leading-relaxed">{{ review.summary }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Quick Actions -->
+        <div class="mt-6 pt-4 border-t border-gray-200">
+            <h4 class="text-sm font-semibold text-gray-700 mb-3">Next Steps</h4>
+            <div class="space-y-2">
+                {% if review.blocking_issues %}
+                <div class="flex items-start text-sm">
+                    <span class="text-red-500 mr-2">1.</span>
+                    <span class="text-gray-700"><strong>Resolve blocking issues</strong> - These must be addressed before the return can be processed</span>
+                </div>
+                {% endif %}
+                {% if review.flagged_transactions_summary and review.flagged_transactions_summary.total_flagged > 0 %}
+                <div class="flex items-start text-sm">
+                    <span class="text-orange-500 mr-2">{% if review.blocking_issues %}2{% else %}1{% endif %}.</span>
+                    <span class="text-gray-700"><strong>Review flagged transactions</strong> - Reconcile each transaction or provide supporting invoices</span>
+                </div>
+                {% endif %}
+                {% if review.missing_documents %}
+                <div class="flex items-start text-sm">
+                    <span class="text-yellow-500 mr-2">{% if review.blocking_issues and review.flagged_transactions_summary %}3{% elif review.blocking_issues or review.flagged_transactions_summary %}2{% else %}1{% endif %}.</span>
+                    <span class="text-gray-700"><strong>Upload missing documents</strong> - Use the "Add Documents" button above</span>
+                </div>
+                {% endif %}
+                {% if not review.blocking_issues and not review.missing_documents and (not review.flagged_transactions_summary or review.flagged_transactions_summary.total_flagged == 0) %}
+                <div class="flex items-start text-sm">
+                    <span class="text-green-500 mr-2 font-bold">OK</span>
+                    <span class="text-gray-700"><strong>Ready for processing</strong> - All documents are in order</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
-    {% endif %}
 
     <!-- Action Buttons -->
     <div class="flex justify-between items-center">
         <div class="flex gap-2">
-            <a href="/" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            <a href="/" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent">
                 ← New Upload
             </a>
             <a href="/feedback?tax_return_id={{ tax_return.id }}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
@@ -293,11 +896,11 @@
     </div>
 </div>
 
-<!-- Quick Feedback Modal -->
-<div id="feedbackModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+<!-- Quick Feedback Modal (Document Classification) -->
+<div id="feedbackModal" class="fixed inset-0 bg-primary bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border border-slate w-full max-w-md shadow-lg rounded-md bg-white">
         <div class="mt-3">
-            <h3 class="text-lg font-medium text-gray-900 mb-4" id="modalTitle">Report Classification Issue</h3>
+            <h3 class="text-lg font-medium text-primary mb-4" id="modalTitle">Report Classification Issue</h3>
 
             <form id="quickFeedbackForm" onsubmit="submitQuickFeedback(event)">
                 <input type="hidden" id="feedbackDocumentId" name="document_id">
@@ -320,7 +923,7 @@
                         Correct Classification <span class="text-red-500">*</span>
                     </label>
                     <select id="correctType" name="correct_type" required
-                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            class="w-full rounded-md border-slate shadow-sm focus:border-accent focus:ring-accent sm:text-sm">
                         <option value="">Select correct type...</option>
                         <option value="bank_statement">Bank Statement</option>
                         <option value="loan_statement">Loan Statement</option>
@@ -347,7 +950,7 @@
                         Additional Notes
                     </label>
                     <textarea id="feedbackNotes" name="notes" rows="3"
-                              class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                              class="w-full rounded-md border-slate shadow-sm focus:border-accent focus:ring-accent sm:text-sm"
                               placeholder="Why should this be classified differently? Any identifying features?"></textarea>
                 </div>
 
@@ -357,8 +960,186 @@
                         Cancel
                     </button>
                     <button type="submit"
-                            class="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                            class="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-accent hover:bg-accent-700">
                         Submit Correction
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Transaction Feedback Modal -->
+<div id="transactionModal" class="fixed inset-0 bg-primary bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+    <div class="relative top-10 mx-auto p-5 border border-slate w-full max-w-lg shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-lg font-medium text-primary mb-4">Transaction Feedback</h3>
+
+            <form id="transactionFeedbackForm" onsubmit="submitTransactionFeedback(event)">
+                <input type="hidden" id="txnFeedbackTaxReturnId" name="tax_return_id" value="{{ tax_return.id }}">
+
+                <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                            <span class="font-medium text-gray-500">Transaction:</span>
+                            <p id="txnDescription" class="text-gray-900 truncate"></p>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-500">Amount:</span>
+                            <p id="txnAmount" class="text-gray-900 font-semibold"></p>
+                        </div>
+                        <div class="col-span-2">
+                            <span class="font-medium text-gray-500">Document:</span>
+                            <p id="txnDocument" class="text-gray-900"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="txnExpenseCategory" class="block text-sm font-medium text-gray-700 mb-1">
+                        Correct Expense Category <span class="text-red-500">*</span>
+                    </label>
+                    <select id="txnExpenseCategory" name="expense_category" required
+                            onchange="toggleCustomCategory(this)"
+                            class="w-full rounded-md border-slate shadow-sm focus:border-accent focus:ring-accent sm:text-sm">
+                        <option value="">Select expense category...</option>
+                        <optgroup label="Income">
+                            <option value="rental_income">Rental Income</option>
+                            <option value="bank_contribution">Bank Contribution</option>
+                            <option value="bond_lodgement">Bond Lodgement/Refund</option>
+                            <option value="other_income">Other Income</option>
+                        </optgroup>
+                        <optgroup label="Interest & Finance">
+                            <option value="mortgage_interest">Mortgage Interest</option>
+                            <option value="loan_principal">Loan Principal (not deductible)</option>
+                            <option value="bank_fees">Bank Fees</option>
+                        </optgroup>
+                        <optgroup label="Rates & Levies">
+                            <option value="council_rates">Council Rates</option>
+                            <option value="water_rates">Water Rates</option>
+                            <option value="body_corporate">Body Corporate Levies</option>
+                        </optgroup>
+                        <optgroup label="Insurance">
+                            <option value="landlord_insurance">Landlord Insurance</option>
+                            <option value="building_insurance">Building Insurance</option>
+                        </optgroup>
+                        <optgroup label="Repairs & Maintenance">
+                            <option value="repairs_maintenance">Repairs & Maintenance</option>
+                            <option value="cleaning">Cleaning</option>
+                            <option value="gardening">Gardening & Lawn Mowing</option>
+                            <option value="pest_control">Pest Control</option>
+                            <option value="plumbing">Plumbing</option>
+                            <option value="electrical">Electrical Work</option>
+                            <option value="painting">Painting</option>
+                        </optgroup>
+                        <optgroup label="Professional Services">
+                            <option value="property_management">Property Management Fees</option>
+                            <option value="accounting_fees">Accounting Fees</option>
+                            <option value="legal_fees">Legal Fees</option>
+                            <option value="valuation_fees">Valuation Fees</option>
+                        </optgroup>
+                        <optgroup label="Advertising & Admin">
+                            <option value="advertising">Advertising for Tenants</option>
+                            <option value="letting_fees">Letting Fees</option>
+                            <option value="stationery">Stationery & Office Expenses</option>
+                        </optgroup>
+                        <optgroup label="Utilities">
+                            <option value="electricity">Electricity</option>
+                            <option value="gas">Gas</option>
+                            <option value="internet">Internet/Phone</option>
+                        </optgroup>
+                        <optgroup label="Travel">
+                            <option value="travel_inspection">Travel - Property Inspection</option>
+                            <option value="travel_maintenance">Travel - Maintenance</option>
+                        </optgroup>
+                        <optgroup label="Other">
+                            <option value="depreciation">Depreciation</option>
+                            <option value="other_deductible">Other Deductible Expense</option>
+                            <option value="capital_expense">Capital Expense (not deductible)</option>
+                            <option value="personal_expense">Personal Expense (not deductible)</option>
+                        </optgroup>
+                        <optgroup label="─────────────────">
+                            <option value="__create_new__">+ Create New Category</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <!-- Custom Category Input (hidden by default) -->
+                <div id="customCategorySection" class="mb-4 hidden space-y-3">
+                    <div>
+                        <label for="customCategoryGroup" class="block text-sm font-medium text-gray-700 mb-1">
+                            Category Group <span class="text-red-500">*</span>
+                        </label>
+                        <select id="customCategoryGroup" name="custom_category_group"
+                                class="w-full rounded-md border-slate shadow-sm focus:border-accent focus:ring-accent sm:text-sm">
+                            <option value="Income">Income</option>
+                            <option value="Interest & Finance">Interest & Finance</option>
+                            <option value="Rates & Levies">Rates & Levies</option>
+                            <option value="Insurance">Insurance</option>
+                            <option value="Repairs & Maintenance" selected>Repairs & Maintenance</option>
+                            <option value="Professional Services">Professional Services</option>
+                            <option value="Advertising & Admin">Advertising & Admin</option>
+                            <option value="Utilities">Utilities</option>
+                            <option value="Travel">Travel</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="customCategoryName" class="block text-sm font-medium text-gray-700 mb-1">
+                            New Category Name <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="customCategoryName" name="custom_category_name"
+                               class="w-full rounded-md border-slate shadow-sm focus:border-accent focus:ring-accent sm:text-sm"
+                               placeholder="e.g., Security Services">
+                        <p id="customCategoryError" class="mt-1 text-xs text-red-600 hidden">
+                            This category already exists. Please select it from the dropdown.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="customCategoryDeductible" checked
+                                   class="rounded border-slate text-accent shadow-sm focus:border-accent focus:ring-accent">
+                            <span class="ml-2 text-sm text-gray-600">This is a deductible rental expense</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="txnVendorName" class="block text-sm font-medium text-gray-700 mb-1">
+                        Vendor/Payee Name
+                    </label>
+                    <input type="text" id="txnVendorName" name="vendor_name"
+                           class="w-full rounded-md border-slate shadow-sm focus:border-accent focus:ring-accent sm:text-sm"
+                           placeholder="e.g., ABC Plumbing, Auckland Council">
+                </div>
+
+                <div class="mb-4">
+                    <label for="txnNotes" class="block text-sm font-medium text-gray-700 mb-1">
+                        Additional Notes
+                    </label>
+                    <textarea id="txnNotes" name="notes" rows="2"
+                              class="w-full rounded-md border-slate shadow-sm focus:border-accent focus:ring-accent sm:text-sm"
+                              placeholder="Any additional context about this transaction..."></textarea>
+                </div>
+
+                <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+                    <p class="text-xs text-blue-800">
+                        <strong>Note:</strong> This feedback helps improve future transaction analysis.
+                        Legitimate rental expenses with proper categorization will not be flagged in future reviews.
+                    </p>
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="closeTransactionModal()"
+                            class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit" id="txnSubmitBtn"
+                            class="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-accent hover:bg-accent-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span id="txnSubmitText">Submit Feedback</span>
+                        <span id="txnSubmitLoading" class="hidden">Submitting...</span>
                     </button>
                 </div>
             </form>
@@ -512,6 +1293,31 @@ function reportDocumentIssue(docId, filename, currentType) {
     document.getElementById('feedbackModal').classList.remove('hidden');
 }
 
+// Toggle document details panel
+function toggleDocumentDetails(docId) {
+    const panel = document.getElementById('details-panel-' + docId);
+    const icon = document.getElementById('details-icon-' + docId);
+    const text = document.getElementById('details-text-' + docId);
+
+    if (panel) {
+        const isHidden = panel.style.display === 'none' || panel.classList.contains('hidden');
+
+        if (isHidden) {
+            // Show panel
+            panel.style.display = 'block';
+            panel.classList.remove('hidden');
+            icon.style.transform = 'rotate(180deg)';
+            text.textContent = 'Hide Details';
+        } else {
+            // Hide panel
+            panel.style.display = 'none';
+            panel.classList.add('hidden');
+            icon.style.transform = 'rotate(0deg)';
+            text.textContent = 'Show Details';
+        }
+    }
+}
+
 function closeModal() {
     document.getElementById('feedbackModal').classList.add('hidden');
     document.getElementById('quickFeedbackForm').reset();
@@ -569,6 +1375,523 @@ function showToast(message) {
     }, 4000);
 }
 
+// Transaction feedback modal functions
+let currentFeedbackButton = null;
+
+function openTransactionFeedback(btn) {
+    const transaction = btn.getAttribute('data-transaction');
+    const amount = btn.getAttribute('data-amount');
+    const doc = btn.getAttribute('data-document');
+
+    currentFeedbackButton = btn;  // Store reference to the button
+
+    document.getElementById('txnDescription').textContent = transaction;
+    document.getElementById('txnAmount').textContent = '$' + parseFloat(amount).toFixed(2);
+    document.getElementById('txnDocument').textContent = doc;
+    document.getElementById('transactionModal').classList.remove('hidden');
+}
+
+// Get all existing category values and text for duplicate checking
+function getExistingCategories() {
+    const select = document.getElementById('txnExpenseCategory');
+    const categories = [];
+    for (let i = 0; i < select.options.length; i++) {
+        const opt = select.options[i];
+        if (opt.value && opt.value !== '__create_new__' && opt.value !== '') {
+            categories.push({
+                value: opt.value.toLowerCase(),
+                text: opt.text.toLowerCase()
+            });
+        }
+    }
+    return categories;
+}
+
+// Toggle custom category input
+function toggleCustomCategory(select) {
+    const customSection = document.getElementById('customCategorySection');
+    const customInput = document.getElementById('customCategoryName');
+
+    if (select.value === '__create_new__') {
+        customSection.classList.remove('hidden');
+        customInput.required = true;
+        customInput.focus();
+    } else {
+        customSection.classList.add('hidden');
+        customInput.required = false;
+        customInput.value = '';
+        document.getElementById('customCategoryError').classList.add('hidden');
+    }
+}
+
+// Check for duplicate category
+function checkDuplicateCategory(inputValue) {
+    const normalized = inputValue.toLowerCase().trim();
+    const normalizedValue = normalized.replace(/[^a-z0-9]/g, '_');
+    const existingCategories = getExistingCategories();
+
+    for (const cat of existingCategories) {
+        // Check if text matches
+        if (cat.text === normalized) {
+            return { isDuplicate: true, matchedText: cat.text };
+        }
+        // Check if value would match (normalized)
+        if (cat.value === normalizedValue) {
+            return { isDuplicate: true, matchedText: cat.text };
+        }
+        // Check for partial matches (e.g., "plumbing" vs "Plumbing Services")
+        if (cat.text.includes(normalized) || normalized.includes(cat.text)) {
+            return { isDuplicate: true, matchedText: cat.text };
+        }
+    }
+    return { isDuplicate: false };
+}
+
+// === Add Documents Functions ===
+let addDocsFiles = [];
+
+function toggleAddDocuments() {
+    const section = document.getElementById('addDocumentsSection');
+    section.classList.toggle('hidden');
+    if (section.classList.contains('hidden')) {
+        // Reset when hiding
+        addDocsFiles = [];
+        updateAddDocsFileList();
+        document.getElementById('additionalFiles').value = '';
+    }
+}
+
+function handleAddDocsFiles(files) {
+    addDocsFiles = [...addDocsFiles, ...Array.from(files)];
+    updateAddDocsFileList();
+}
+
+function handleAddDocsDrop(event) {
+    const files = event.dataTransfer.files;
+    handleAddDocsFiles(files);
+    // Update the file input
+    const dataTransfer = new DataTransfer();
+    addDocsFiles.forEach(file => dataTransfer.items.add(file));
+    document.getElementById('additionalFiles').files = dataTransfer.files;
+}
+
+function removeAddDocsFile(index) {
+    addDocsFiles.splice(index, 1);
+    updateAddDocsFileList();
+    // Update the file input
+    const dataTransfer = new DataTransfer();
+    addDocsFiles.forEach(file => dataTransfer.items.add(file));
+    document.getElementById('additionalFiles').files = dataTransfer.files;
+}
+
+function updateAddDocsFileList() {
+    const listContainer = document.getElementById('addDocsFileList');
+    const listItems = document.getElementById('addDocsFileListItems');
+    const countSpan = document.getElementById('addDocsFileCount');
+
+    if (addDocsFiles.length === 0) {
+        listContainer.classList.add('hidden');
+        return;
+    }
+
+    listContainer.classList.remove('hidden');
+    countSpan.textContent = addDocsFiles.length;
+
+    listItems.innerHTML = addDocsFiles.map((file, index) => `
+        <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
+            <div class="flex-1 flex items-center">
+                <span class="flex-1 truncate">${file.name}</span>
+                <span class="ml-2 text-gray-500">${formatFileSize(file.size)}</span>
+            </div>
+            <button type="button" onclick="removeAddDocsFile(${index})"
+                    class="ml-4 text-red-600 hover:text-red-800">Remove</button>
+        </li>
+    `).join('');
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+// Handle add documents form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const addDocsForm = document.getElementById('addDocumentsForm');
+    if (addDocsForm) {
+        addDocsForm.addEventListener('submit', function() {
+            const submitBtn = document.getElementById('addDocsSubmitBtn');
+            const submitText = document.getElementById('addDocsSubmitText');
+            const submitLoading = document.getElementById('addDocsSubmitLoading');
+
+            submitBtn.disabled = true;
+            submitText.classList.add('hidden');
+            submitLoading.classList.remove('hidden');
+        });
+    }
+});
+
+// Load custom categories from API on page load
+async function loadCustomCategories() {
+    try {
+        const response = await fetch('/api/categories');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.categories && data.categories.length > 0) {
+                data.categories.forEach(cat => {
+                    addCustomCategoryToDropdown(cat.name, cat.value, cat.is_deductible, cat.group);
+                });
+                console.log(`Loaded ${data.categories.length} custom categories`);
+            }
+        }
+    } catch (error) {
+        console.error('Error loading custom categories:', error);
+    }
+}
+
+// Save custom category to API
+async function saveCustomCategory(name, value, group, isDeductible) {
+    try {
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('value', value);
+        formData.append('group', group);
+        formData.append('is_deductible', isDeductible);
+
+        const response = await fetch('/api/categories', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            console.log('Custom category saved successfully');
+            return true;
+        } else {
+            console.error('Failed to save custom category');
+            return false;
+        }
+    } catch (error) {
+        console.error('Error saving custom category:', error);
+        return false;
+    }
+}
+
+// Validate custom category on input
+document.addEventListener('DOMContentLoaded', function() {
+    // Load custom categories
+    loadCustomCategories();
+
+    const customInput = document.getElementById('customCategoryName');
+    if (customInput) {
+        customInput.addEventListener('input', function() {
+            const errorEl = document.getElementById('customCategoryError');
+            const result = checkDuplicateCategory(this.value);
+
+            if (result.isDuplicate && this.value.trim().length > 0) {
+                errorEl.textContent = `Similar category "${result.matchedText}" already exists. Please select it from the dropdown.`;
+                errorEl.classList.remove('hidden');
+                this.classList.add('border-red-500');
+            } else {
+                errorEl.classList.add('hidden');
+                this.classList.remove('border-red-500');
+            }
+        });
+    }
+});
+
+// Add custom category to dropdown for future use
+function addCustomCategoryToDropdown(displayText, value, isDeductible, groupName) {
+    const select = document.getElementById('txnExpenseCategory');
+
+    // Find the target optgroup by label
+    let targetGroup = select.querySelector(`optgroup[label="${groupName}"]`);
+
+    // If not found, create a new group
+    if (!targetGroup) {
+        targetGroup = document.createElement('optgroup');
+        targetGroup.label = groupName;
+
+        // Insert before the "Create New" optgroup
+        const createNewGroup = select.querySelector('optgroup[label="─────────────────"]');
+        if (createNewGroup) {
+            select.insertBefore(targetGroup, createNewGroup);
+        } else {
+            select.appendChild(targetGroup);
+        }
+    }
+
+    // Create the new option
+    const newOption = document.createElement('option');
+    newOption.value = value;
+    newOption.textContent = displayText + (isDeductible ? '' : ' (not deductible)');
+
+    // Add to the target group
+    targetGroup.appendChild(newOption);
+}
+
+function closeTransactionModal() {
+    document.getElementById('transactionModal').classList.add('hidden');
+    document.getElementById('transactionFeedbackForm').reset();
+    document.getElementById('customCategorySection').classList.add('hidden');
+    document.getElementById('customCategoryError').classList.add('hidden');
+    document.getElementById('customCategoryName').classList.remove('border-red-500');
+    resetSubmitButton();
+    currentFeedbackButton = null;
+}
+
+function resetSubmitButton() {
+    const submitBtn = document.getElementById('txnSubmitBtn');
+    submitBtn.disabled = false;
+    document.getElementById('txnSubmitText').classList.remove('hidden');
+    document.getElementById('txnSubmitLoading').classList.add('hidden');
+}
+
+async function submitTransactionFeedback(event) {
+    event.preventDefault();
+
+    // Prevent double submission
+    const submitBtn = document.getElementById('txnSubmitBtn');
+    if (submitBtn.disabled) return;
+
+    submitBtn.disabled = true;
+    document.getElementById('txnSubmitText').classList.add('hidden');
+    document.getElementById('txnSubmitLoading').classList.remove('hidden');
+
+    const transaction = document.getElementById('txnDescription').textContent;
+    const amount = document.getElementById('txnAmount').textContent;
+    const docName = document.getElementById('txnDocument').textContent;
+    let expenseCategory = document.getElementById('txnExpenseCategory').value;
+    const vendorName = document.getElementById('txnVendorName').value;
+    const notes = document.getElementById('txnNotes').value;
+
+    // Track if this is a custom category before modifying expenseCategory
+    const isCustomCategory = expenseCategory === '__create_new__';
+
+    // Handle custom category
+    let categoryText;
+    let isDeductible;
+    let selectedGroup = null;
+
+    if (isCustomCategory) {
+        const customName = document.getElementById('customCategoryName').value.trim();
+
+        // Validate custom category isn't duplicate
+        const duplicateCheck = checkDuplicateCategory(customName);
+        if (duplicateCheck.isDuplicate) {
+            document.getElementById('customCategoryError').textContent =
+                `Similar category "${duplicateCheck.matchedText}" already exists. Please select it from the dropdown.`;
+            document.getElementById('customCategoryError').classList.remove('hidden');
+            document.getElementById('customCategoryName').classList.add('border-red-500');
+            resetSubmitButton();
+            return;
+        }
+
+        if (!customName) {
+            alert('Please enter a category name');
+            resetSubmitButton();
+            return;
+        }
+
+        categoryText = customName;
+        expenseCategory = customName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        isDeductible = document.getElementById('customCategoryDeductible').checked;
+        selectedGroup = document.getElementById('customCategoryGroup').value;
+    } else {
+        // Get the display text for the category
+        const categorySelect = document.getElementById('txnExpenseCategory');
+        categoryText = categorySelect.options[categorySelect.selectedIndex].text;
+
+        isDeductible = !expenseCategory.includes('not_deductible') &&
+                       expenseCategory !== 'personal_expense' &&
+                       expenseCategory !== 'capital_expense' &&
+                       expenseCategory !== 'loan_principal';
+    }
+
+    // Build learning content based on expense category
+    let content;
+
+    if (isDeductible) {
+        content = `Transaction "${transaction}" (${amount}) is a LEGITIMATE rental expense. ` +
+                  `Category: ${categoryText}. ` +
+                  (vendorName ? `Vendor: ${vendorName}. ` : '') +
+                  `Do NOT flag similar transactions to this vendor/type in future analyses. ` +
+                  (notes ? `Notes: ${notes}` : '');
+    } else {
+        content = `Transaction "${transaction}" (${amount}) is NOT a deductible rental expense. ` +
+                  `Category: ${categoryText}. ` +
+                  (vendorName ? `Vendor: ${vendorName}. ` : '') +
+                  `Continue flagging similar transactions as they are not legitimate rental expenses. ` +
+                  (notes ? `Notes: ${notes}` : '');
+    }
+
+    const scenario = isDeductible ? 'legitimate_rental_expense' : 'non_deductible_expense';
+
+    try {
+        // Use the transactions feedback endpoint for proper reconciliation tracking
+        const response = await fetch('/api/transactions/feedback', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                transaction_description: transaction,
+                amount: parseFloat(amount.replace('$', '')),
+                document_name: docName,
+                resolution: isDeductible ? 'legitimate' : 'personal',
+                vendor_name: vendorName || null,
+                expense_category: categoryText,
+                notes: notes || null,
+                tax_return_id: '{{ tax_return.id }}'
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+
+            // If this was a custom category, save it to API and add to dropdown
+            if (isCustomCategory && selectedGroup) {
+                // Save to API for persistence across page reloads
+                await saveCustomCategory(categoryText, expenseCategory, selectedGroup, isDeductible);
+                // Add to current dropdown
+                addCustomCategoryToDropdown(categoryText, expenseCategory, isDeductible, selectedGroup);
+            }
+
+            // Mark the row as reconciled BEFORE closing modal
+            // (closeTransactionModal sets currentFeedbackButton to null)
+            if (currentFeedbackButton) {
+                markRowAsReconciled(currentFeedbackButton, 'categorize');
+            }
+
+            closeTransactionModal();
+
+            // Check if status was updated to complete
+            if (result.status_updated && result.new_status === 'complete') {
+                // Update the status badge on the page
+                updateStatusBadge('complete');
+                showToast('All transactions reconciled! Status updated to COMPLETE.');
+            } else if (isDeductible) {
+                showToast('Categorized as ' + categoryText + '. AI will learn from this.');
+            } else {
+                showToast('Categorized as ' + categoryText + '. Similar transactions will be flagged.');
+            }
+        } else {
+            const error = await response.json();
+            alert('Failed to submit feedback: ' + (error.detail || 'Unknown error'));
+            resetSubmitButton();
+        }
+    } catch (error) {
+        alert('Error submitting feedback: ' + error.message);
+        resetSubmitButton();
+    }
+}
+
+// Update status badge dynamically
+function updateStatusBadge(newStatus) {
+    const statusBadges = document.querySelectorAll('.rounded-full.font-medium');
+    statusBadges.forEach(badge => {
+        if (badge.textContent.includes('COMPLETE') || badge.textContent.includes('BLOCKED') ||
+            badge.textContent.includes('INCOMPLETE') || badge.textContent.includes('PENDING')) {
+            if (newStatus === 'complete') {
+                badge.className = 'px-4 py-2 bg-green-100 text-green-800 rounded-full font-medium';
+                badge.textContent = 'COMPLETE';
+            }
+        }
+    });
+}
+
+// Track reconciled count
+let reconciledTransactions = new Set();
+
+// Update the reconciled counter in header
+function updateReconciledCounter() {
+    const counterEl = document.getElementById('reconciledCount');
+    if (counterEl) {
+        counterEl.textContent = reconciledTransactions.size;
+    }
+}
+
+// Mark a transaction row as reconciled
+function markRowAsReconciled(btn, method = 'ok') {
+    const row = btn.closest('.transaction-row');
+    if (row) {
+        const txnKey = row.getAttribute('data-txn-key');
+        reconciledTransactions.add(txnKey);
+        updateReconciledCounter();
+
+        // Update row appearance
+        row.classList.add('bg-green-50');
+        row.classList.remove('hover:bg-gray-50');
+
+        // Replace action buttons with reconciled indicator
+        const actionBtns = row.querySelector('.action-buttons');
+        if (actionBtns) {
+            const label = method === 'categorize' ? 'Categorized' : 'Reviewed';
+            actionBtns.innerHTML = `
+                <span class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-green-700 bg-green-100">
+                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    ${label}
+                </span>
+            `;
+        }
+    }
+}
+
+// Quick reconcile without AI learning (for one-off transactions)
+async function quickReconcile(btn) {
+    const transaction = btn.getAttribute('data-transaction');
+    const amount = btn.getAttribute('data-amount');
+    const docName = btn.getAttribute('data-document');
+
+    // Disable buttons to prevent double-click
+    const row = btn.closest('.transaction-row');
+    const buttons = row.querySelectorAll('button');
+    buttons.forEach(b => b.disabled = true);
+    btn.innerHTML = '<svg class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+
+    try {
+        const response = await fetch('/api/transactions/reconcile', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                transaction_description: transaction,
+                amount: parseFloat(amount),
+                document_name: docName,
+                tax_return_id: '{{ tax_return.id }}'
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+
+            // Mark row as reconciled
+            markRowAsReconciled(btn, 'ok');
+
+            // Check if status was updated to complete
+            if (result.status_updated && result.new_status === 'complete') {
+                updateStatusBadge('complete');
+                showToast('All transactions reconciled! Status updated to COMPLETE.');
+            } else {
+                showToast('Transaction marked as reviewed.');
+            }
+        } else {
+            const error = await response.json();
+            alert('Failed to reconcile: ' + (error.detail || 'Unknown error'));
+            buttons.forEach(b => b.disabled = false);
+            btn.innerHTML = '<svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>OK';
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+        buttons.forEach(b => b.disabled = false);
+        btn.innerHTML = '<svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>OK';
+    }
+}
+
 // Close modal when clicking outside
 document.getElementById('feedbackModal').addEventListener('click', function(e) {
     if (e.target === this) {
@@ -576,10 +1899,17 @@ document.getElementById('feedbackModal').addEventListener('click', function(e) {
     }
 });
 
+document.getElementById('transactionModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeTransactionModal();
+    }
+});
+
 // Close modal with Escape key
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closeModal();
+        closeTransactionModal();
     }
 });
 </script>

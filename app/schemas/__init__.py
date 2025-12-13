@@ -1,4 +1,5 @@
 """Pydantic schemas package."""
+
 from app.schemas.documents import (
     DocumentAnalysis,
     DocumentClassification,

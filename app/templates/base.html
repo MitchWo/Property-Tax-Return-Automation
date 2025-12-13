@@ -7,6 +7,58 @@
 
     <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    maxWidth: {
+                        '8xl': '88rem',
+                        '9xl': '96rem',
+                    },
+                    colors: {
+                        primary: {
+                            DEFAULT: '#0c113e',
+                            50: '#f0f1f8',
+                            100: '#d9dbe8',
+                            200: '#b3b7d1',
+                            300: '#8d93ba',
+                            400: '#676fa3',
+                            500: '#414b8c',
+                            600: '#2b3270',
+                            700: '#1b2154',
+                            800: '#0c113e',
+                            900: '#060822'
+                        },
+                        accent: {
+                            DEFAULT: '#B82843',
+                            50: '#fdf2f4',
+                            100: '#fce4e9',
+                            200: '#f9cdd6',
+                            300: '#f4a6b6',
+                            400: '#ec7a92',
+                            500: '#B82843',
+                            600: '#a32039',
+                            700: '#891a30',
+                            800: '#6f1527',
+                            900: '#5a1221'
+                        },
+                        rose: {
+                            DEFAULT: '#FAA4BD',
+                            light: '#fcd5e0'
+                        },
+                        slate: {
+                            DEFAULT: '#CCD3E1',
+                            light: '#e1e5ed'
+                        },
+                        cream: {
+                            DEFAULT: '#e9e7e0',
+                            light: '#f4f3ef'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
 
     <!-- HTMX for interactivity -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
@@ -17,39 +69,79 @@
     <style>
         [x-cloak] { display: none !important; }
         .loader {
-            border-top-color: #3498db;
+            border-top-color: #B82843;
             animation: spinner 1.5s linear infinite;
         }
         @keyframes spinner {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        /* Add padding to form inputs */
+        input[type="text"],
+        input[type="number"],
+        input[type="email"],
+        input[type="password"],
+        input[type="search"],
+        input[type="tel"],
+        input[type="url"],
+        select,
+        textarea {
+            padding: 0.625rem 1rem;
+            border-color: #CCD3E1;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: #B82843;
+            box-shadow: 0 0 0 3px rgba(184, 40, 67, 0.1);
+        }
+        /* Smooth animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.2s ease-out;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e9e7e0;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #CCD3E1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #B82843;
+        }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-white min-h-screen flex flex-col">
     <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header class="bg-primary shadow-lg">
+        <div class="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center">
-                    <h1 class="text-xl font-semibold text-gray-900">
+                    <h1 class="text-xl font-semibold text-white">
                         NZ Property Tax Document Review
                     </h1>
-                    <span class="ml-3 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    <span class="ml-3 px-2 py-1 text-xs bg-accent text-white rounded-full font-medium">
                         Phase 1
                     </span>
                 </div>
-                <nav class="flex space-x-4">
-                    <a href="/" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                <nav class="flex space-x-1">
+                    <a href="/" class="text-slate hover:text-white hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium transition-colors">
                         Upload
                     </a>
-                    <a href="/returns" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                    <a href="/returns" class="text-slate hover:text-white hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium transition-colors">
                         All Returns
                     </a>
-                    <a href="/learnings" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                    <a href="/learnings" class="text-slate hover:text-white hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium transition-colors">
                         Learnings
                     </a>
-                    <a href="/feedback" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                    <a href="/feedback" class="text-slate hover:text-white hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium transition-colors">
                         Feedback
                     </a>
                 </nav>
@@ -58,15 +150,15 @@
     </header>
 
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="{% block main_class %}w-[90%] mx-auto{% endblock %} px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         {% block content %}{% endblock %}
     </main>
 
     <!-- Footer -->
-    <footer class="bg-white border-t border-gray-200 mt-auto">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <p class="text-sm text-gray-500 text-center">
-                © 2024 Property Tax Agent - Document Review System v1.0
+    <footer class="bg-primary border-t border-primary-700 mt-auto">
+        <div class="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <p class="text-sm text-slate text-center">
+                © 2025 Property Tax Agent - Document Review System v1.0
             </p>
         </div>
     </footer>

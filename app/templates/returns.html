@@ -3,14 +3,14 @@
 {% block title %}All Returns - Property Tax Review{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto">
-    <div class="bg-white shadow rounded-lg">
+<div class="w-full">
+    <div class="bg-white shadow rounded-lg border border-gray-200">
         <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <div>
-                <h2 class="text-2xl font-bold text-gray-900">All Tax Returns</h2>
+                <h2 class="text-2xl font-bold text-primary">All Tax Returns</h2>
                 <p class="text-sm text-gray-500 mt-1">{{ returns|length }} total returns</p>
             </div>
-            <a href="/" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+            <a href="/" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-accent hover:bg-accent-700">
                 + New Upload
             </a>
         </div>
@@ -41,8 +41,21 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {{ tr.tax_year }}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ "New Build" if tr.property_type.value == "new_build" else "Existing" }}
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            {% set ai_suggestion = tr.review_result.property_type_suggestion.suggested_type if tr.review_result and tr.review_result.property_type_suggestion else none %}
+                            {% if ai_suggestion %}
+                                {% if ai_suggestion == "new_build" %}
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">New Build</span>
+                                {% else %}
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Existing</span>
+                                {% endif %}
+                            {% elif tr.property_type.value == "new_build" %}
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">New Build</span>
+                            {% elif tr.property_type.value == "not_sure" %}
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">Not Sure</span>
+                            {% else %}
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Existing</span>
+                            {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             {% if tr.status.value == "complete" %}
@@ -59,7 +72,7 @@
                             {{ tr.created_at.strftime('%d %b %Y %H:%M') }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <a href="/result/{{ tr.id }}" class="text-blue-600 hover:text-blue-800">View</a>
+                            <a href="/result/{{ tr.id }}" class="text-accent hover:text-accent-700">View</a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -70,7 +83,7 @@
         <div class="text-center py-12 text-gray-500">
             <p class="text-lg">No tax returns yet</p>
             <p class="text-sm mt-1">
-                <a href="/" class="text-blue-600">Upload documents</a> to create your first return
+                <a href="/" class="text-accent hover:text-accent-700">Upload documents</a> to create your first return
             </p>
         </div>
         {% endif %}
