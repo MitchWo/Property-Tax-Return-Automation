@@ -1,20 +1,19 @@
-"""Workbook generator service for creating IR3R Excel workbooks."""
+"""Workbook generator service for creating Lighthouse Financial property tax workbooks.
+
+Updated to match exact Lighthouse Financial template with 2 sheets:
+- Profit and Loss (with P&L left, workings right)
+- IRD (compliance checklist)
+"""
 import logging
-from datetime import date, datetime
+from collections import defaultdict
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from openpyxl import Workbook
-from openpyxl.styles import (
-    Alignment,
-    Border,
-    Font,
-    NamedStyle,
-    PatternFill,
-    Side,
-)
+from openpyxl.styles import Alignment, Border, Font, NamedStyle, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 from sqlalchemy import select
@@ -41,31 +40,11 @@ logger = logging.getLogger(__name__)
 def create_styles(wb: Workbook):
     """Create named styles for the workbook."""
 
-    # Header style - dark blue
+    # Header style - bold
     header_style = NamedStyle(name="header")
-    header_style.font = Font(bold=True, size=11, color="FFFFFF")
-    header_style.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_style.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    header_style.border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin")
-    )
+    header_style.font = Font(bold=True, size=11)
+    header_style.alignment = Alignment(horizontal="left", vertical="center")
     wb.add_named_style(header_style)
-
-    # Sub-header style - light blue
-    subheader_style = NamedStyle(name="subheader")
-    subheader_style.font = Font(bold=True, size=10)
-    subheader_style.fill = PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid")
-    subheader_style.alignment = Alignment(horizontal="center", vertical="center")
-    subheader_style.border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin")
-    )
-    wb.add_named_style(subheader_style)
 
     # Currency style
     currency_style = NamedStyle(name="currency")
@@ -81,23 +60,20 @@ def create_styles(wb: Workbook):
 
     # Percentage style
     percent_style = NamedStyle(name="percent")
-    percent_style.number_format = '0.00%'
+    percent_style.number_format = '0%'
     percent_style.alignment = Alignment(horizontal="right")
     wb.add_named_style(percent_style)
 
     # Date style
     date_style = NamedStyle(name="date_style")
     date_style.number_format = 'DD/MM/YYYY'
-    date_style.alignment = Alignment(horizontal="center")
+    date_style.alignment = Alignment(horizontal="left")
     wb.add_named_style(date_style)
 
-    # Section header - medium blue
+    # Section header
     section_style = NamedStyle(name="section")
-    section_style.font = Font(bold=True, size=11, color="1F4E79")
-    section_style.fill = PatternFill(start_color="D9E2F3", end_color="D9E2F3", fill_type="solid")
-    section_style.border = Border(
-        bottom=Side(style="medium", color="4472C4")
-    )
+    section_style.font = Font(bold=True, size=11)
+    section_style.fill = PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid")
     wb.add_named_style(section_style)
 
     # Total row
@@ -107,39 +83,14 @@ def create_styles(wb: Workbook):
     total_style.number_format = '"$"#,##0.00'
     wb.add_named_style(total_style)
 
-    # Subtotal row
-    subtotal_style = NamedStyle(name="subtotal")
-    subtotal_style.font = Font(bold=True)
-    subtotal_style.fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-    subtotal_style.number_format = '"$"#,##0.00'
-    wb.add_named_style(subtotal_style)
-
-    # Income (green)
-    income_style = NamedStyle(name="income")
-    income_style.font = Font(color="006400")
-    income_style.number_format = '"$"#,##0.00'
-    wb.add_named_style(income_style)
-
-    # Expense (dark red)
-    expense_style = NamedStyle(name="expense")
-    expense_style.font = Font(color="8B0000")
-    expense_style.number_format = '"$"#,##0.00'
-    wb.add_named_style(expense_style)
-
-    # Link style (for formula references)
-    link_style = NamedStyle(name="link")
-    link_style.font = Font(color="0563C1", underline="single")
-    link_style.number_format = '"$"#,##0.00'
-    wb.add_named_style(link_style)
-
-    # Note style
-    note_style = NamedStyle(name="note")
-    note_style.font = Font(italic=True, color="666666", size=9)
-    wb.add_named_style(note_style)
+    # Small text
+    small_style = NamedStyle(name="small")
+    small_style.font = Font(size=9)
+    wb.add_named_style(small_style)
 
 
 class WorkbookGenerator:
-    """Generate IR3R Excel workbooks from processed transactions."""
+    """Generate Lighthouse Financial template workbooks from processed transactions."""
 
     def __init__(self):
         """Initialize workbook generator."""
@@ -147,16 +98,13 @@ class WorkbookGenerator:
         self.output_dir = settings.UPLOAD_DIR / "workbooks"
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Track row references for P&L formulas
-        self.sheet_references = {}
-
     async def generate_workbook(
         self,
         db: AsyncSession,
         tax_return_id: UUID
     ) -> Path:
         """
-        Generate complete IR3R workbook for a tax return.
+        Generate complete Lighthouse Financial workbook for a tax return.
 
         Args:
             db: Database session
@@ -165,9 +113,6 @@ class WorkbookGenerator:
         Returns:
             Path to generated workbook file
         """
-        # Reset references
-        self.sheet_references = {}
-
         # Load all data
         tax_return = await self._load_tax_return(db, tax_return_id)
         transactions = await self._load_transactions(db, tax_return_id)
@@ -178,7 +123,6 @@ class WorkbookGenerator:
         interest_deductibility = await self.tax_rules_service.get_interest_deductibility(
             db, tax_return.tax_year, tax_return.property_type.value
         )
-        accounting_fee = await self.tax_rules_service.get_accounting_fee(db)
 
         # Create workbook
         wb = Workbook()
@@ -187,6 +131,12 @@ class WorkbookGenerator:
         # Remove default sheet
         default_sheet = wb.active
 
+        # Create sheets
+        pl_sheet = wb.create_sheet("Profit and Loss", 0)
+        ird_sheet = wb.create_sheet("IRD", 1)
+
+        logger.info(f"Created new workbook with sheets: {wb.sheetnames}")
+
         # Build context
         context = {
             "tax_return": tax_return,
@@ -194,60 +144,23 @@ class WorkbookGenerator:
             "summaries": summaries,
             "pl_mappings": pl_mappings,
             "interest_deductibility": interest_deductibility,
-            "accounting_fee": accounting_fee
         }
-
-        # Create tabs in order (P&L will be first but built last)
-        pl_sheet = wb.create_sheet("P&L", 0)
-        rental_bs_sheet = wb.create_sheet("Rental BS", 1)
-        interest_sheet = wb.create_sheet("Interest Workings", 2)
-
-        # Check if we have PM statement transactions
-        pm_transactions = [t for t in transactions
-                         if hasattr(t, 'raw_data') and t.raw_data and t.raw_data.get("source") == "pm_statement"]
-        pm_sheet = None
-        if pm_transactions or any(s.category_code == "agent_fees" for s in summaries):
-            pm_sheet = wb.create_sheet("PM Statements", 3)
-
-        # Year 1 settlement tab
-        settlement_sheet = None
-        if tax_return.year_of_ownership == 1:
-            settlement_sheet = wb.create_sheet("Settlement", 4 if pm_sheet else 3)
-
-        # Depreciation tab
-        depreciation_sheet = None
-        dep_summary = next((s for s in summaries if s.category_code == "depreciation"), None)
-        if dep_summary:
-            idx = 5 if pm_sheet and settlement_sheet else (4 if pm_sheet or settlement_sheet else 3)
-            depreciation_sheet = wb.create_sheet("Depreciation", idx)
 
         # Remove default sheet
         if default_sheet and default_sheet.title == "Sheet":
             wb.remove(default_sheet)
 
-        # Build sheets (order matters - build referenced sheets first)
-        self._build_rental_bs_sheet(rental_bs_sheet, context)
-        self._build_interest_sheet(interest_sheet, context)
-
-        if pm_sheet:
-            self._build_pm_sheet(pm_sheet, context)
-
-        if settlement_sheet:
-            self._build_settlement_sheet(settlement_sheet, context)
-
-        if depreciation_sheet:
-            self._build_depreciation_sheet(depreciation_sheet, context)
-
-        # Build P&L last (uses references from other sheets)
-        self._build_pl_sheet(pl_sheet, context)
+        # Build sheets
+        self._build_profit_loss_sheet(pl_sheet, context)
+        self._build_ird_sheet(ird_sheet, context)
 
         # Set P&L as active
         wb.active = pl_sheet
 
-        # Generate filename
+        # Generate filename matching template
         client_name = self._sanitize_filename(tax_return.client.name)
-        address_short = self._sanitize_filename(tax_return.property_address.split(",")[0][:20])
-        filename = f"{client_name}_{address_short}_{tax_return.tax_year}_IR3R.xlsx"
+        year = tax_return.tax_year[-2:]  # FY24 -> 24
+        filename = f"PTR01_-_Rental_Property_Workbook_-_{client_name}_-_{year}.xlsx"
         filepath = self.output_dir / filename
 
         # Save
@@ -258,665 +171,433 @@ class WorkbookGenerator:
 
     def _sanitize_filename(self, name: str) -> str:
         """Sanitize string for use in filename."""
-        return "".join(c if c.isalnum() or c in "._- " else "_" for c in name).replace(" ", "_")
+        return "".join(c if c.isalnum() or c in "_- " else "_" for c in name).replace(" ", "_")
 
-    def _build_pl_sheet(self, ws: Worksheet, context: Dict[str, Any]):
-        """Build the P&L (Profit & Loss) sheet with formula references."""
+    def _build_profit_loss_sheet(self, ws: Worksheet, context: Dict[str, Any]):
+        """Build the Profit and Loss sheet matching Lighthouse template."""
         tax_return = context["tax_return"]
+        transactions = context["transactions"]
         summaries = context["summaries"]
         pl_mappings = context["pl_mappings"]
-        accounting_fee = context["accounting_fee"]
         interest_deductibility = context["interest_deductibility"]
 
         # Create lookups
         summary_by_category = {s.category_code: s for s in summaries}
         mapping_by_code = {m.category_code: m for m in pl_mappings}
 
-        # Title
-        ws["A1"] = "RENTAL PROPERTY PROFIT & LOSS"
-        ws["A1"].font = Font(bold=True, size=16, color="1F4E79")
-        ws.merge_cells("A1:E1")
+        # Set column widths
+        ws.column_dimensions["A"].width = 30
+        ws.column_dimensions["B"].width = 2
+        ws.column_dimensions["C"].width = 15
+        ws.column_dimensions["D"].width = 8
+        ws.column_dimensions["E"].width = 2
+        ws.column_dimensions["F"].width = 2
+        ws.column_dimensions["G"].width = 2
+        ws.column_dimensions["H"].width = 2
+        ws.column_dimensions["I"].width = 2
+        ws.column_dimensions["J"].width = 40
+        ws.column_dimensions["K"].width = 15
+        ws.column_dimensions["L"].width = 15
+        ws.column_dimensions["M"].width = 15
+        ws.column_dimensions["N"].width = 15
+        ws.column_dimensions["O"].width = 15
+        ws.column_dimensions["P"].width = 15
+        ws.column_dimensions["Q"].width = 15
 
-        # Property details box
-        ws["A3"] = "Client:"
-        ws["B3"] = tax_return.client.name
-        ws["A4"] = "Property:"
-        ws["B4"] = tax_return.property_address
-        ws["A5"] = "Tax Year:"
-        ws["B5"] = tax_return.tax_year
-        ws["D3"] = "Property Type:"
-        ws["E3"] = "New Build" if tax_return.property_type.value == "new_build" else "Existing"
-        ws["D4"] = "Year of Ownership:"
-        ws["E4"] = tax_return.year_of_ownership
-        ws["D5"] = "GST Registered:"
-        ws["E5"] = "Yes" if tax_return.gst_registered else "No"
+        # ===== LEFT SIDE - P&L SUMMARY =====
 
-        for cell in ["A3", "A4", "A5", "D3", "D4", "D5"]:
-            ws[cell].font = Font(bold=True)
+        # Client details (Rows 1-5)
+        ws["A1"] = "Client Name"
+        ws["B1"] = client_name = tax_return.client.name
+        ws["D1"] = "Business Commencement Date"
+        ws["E1"] = ""  # Would need this field
 
-        # Column headers
+        ws["A2"] = "Resident for Tax Purposes"
+        ws["B2"] = "Y"
+
+        ws["C4"] = "Property Ownership"
+        ws["C5"] = tax_return.property_address
+        ws["E5"] = f"Property Type: {'New Build' if tax_return.property_type.value == 'new_build' else 'Existing'}"
+        ws["F5"] = f"Year: {tax_return.year_of_ownership}"
+
+        # Income section (Rows 6-9)
+        row = 6
+        ws[f"A{row}"] = "Rental Income"
+        income_summary = summary_by_category.get("rental_income")
+        ws[f"C{row}"] = float(abs(income_summary.gross_amount)) if income_summary else 0
+        ws[f"C{row}"].style = "currency"
+        ws[f"D{row}"] = "BS/PM"
+
+        row = 7
+        ws[f"A{row}"] = "Water Rates Recovered"
+        water_rec_summary = summary_by_category.get("water_rates_recovered")
+        ws[f"C{row}"] = float(abs(water_rec_summary.gross_amount)) if water_rec_summary else 0
+        ws[f"C{row}"].style = "currency"
+        ws[f"D{row}"] = "BS"
+
         row = 8
-        headers = ["Row", "Category", "Amount", "Source", "Reference"]
-        col_widths = [6, 35, 15, 10, 35]
+        ws[f"A{row}"] = "Bank Contribution"
+        bank_contrib_summary = summary_by_category.get("bank_contribution")
+        ws[f"C{row}"] = float(abs(bank_contrib_summary.gross_amount)) if bank_contrib_summary else 0
+        ws[f"C{row}"].style = "currency"
+        ws[f"D{row}"] = "BS"
 
-        for col, (header, width) in enumerate(zip(headers, col_widths), 1):
-            cell = ws.cell(row=row, column=col, value=header)
-            cell.style = "header"
-            ws.column_dimensions[get_column_letter(col)].width = width
+        row = 9
+        ws[f"A{row}"] = "Total Income"
+        ws[f"A{row}"].font = Font(bold=True)
+        ws[f"C{row}"] = f"=SUM(C6:C8)"
+        ws[f"C{row}"].style = "total"
 
-        # INCOME Section
-        row += 2
-        ws.cell(row=row, column=1, value="")
-        ws.cell(row=row, column=2, value="INCOME").style = "section"
-        ws.merge_cells(f"B{row}:E{row}")
+        # Expenses section (Rows 11-43)
+        row = 11
+        ws[f"A{row}"] = "Expenses"
+        ws[f"A{row}"].font = Font(bold=True)
 
-        income_categories = [
-            ("rental_income", 6),
-            ("water_rates_recovered", 7),
-            ("bank_contribution", 8),
-            ("insurance_payout", 9),
-            ("other_income", 10),
+        # Map categories to rows with Lighthouse template row numbers
+        expense_rows = [
+            (12, "advertising", "Advertising"),
+            (13, "agent_fees", "Agent Fees"),
+            (14, "assets_under_500", "Assets Under $500"),
+            (15, "bank_fees", "Bank Fees"),
+            (16, "cleaning", "Cleaning"),
+            (17, "consulting_accounting", "Consulting & Accounting"),
+            (18, "depreciation", "Depreciation"),
+            (19, "due_diligence", "Due Diligence"),
+            (20, "entertainment", "Entertainment"),
+            (21, "entertainment_non_deductible", "Entertainment - Non deductible"),
+            (22, "freight_courier", "Freight & Courier"),
+            (23, "general_expenses", "General Expenses"),
+            (24, "home_office", "Home Office Expense"),
+            (25, "insurance", "Insurance"),
+            (26, "interest", "Interest Expense"),
+            (27, "legal_fees", "Legal Expenses"),
+            (28, "electricity", "Light, Power, Heating"),
+            (29, "loss_on_disposal", "Loss on Disposal of Fixed Asset"),
+            (30, "vehicle_expenses", "Motor Vehicle Expenses"),
+            (31, "office_expenses", "Office Expenses"),
+            (32, "overdraft_interest", "Overdraft Interest"),
+            (33, "printing_stationery", "Printing & Stationery"),
+            (34, "rates", "Rates"),
+            (35, "repairs_maintenance", "Repairs & Maintenance"),
+            (36, "shareholder_salary", "Shareholder Salary"),
+            (37, "subscriptions", "Subscriptions"),
+            (38, "telephone_internet", "Telephone & Internet"),
+            (39, "travel_national", "Travel - National"),
+            (40, "travel_international", "Travel - International"),
+            (41, "water_rates", "Water Rates"),
         ]
 
-        income_start_row = row + 1
+        for row_num, category_code, display_name in expense_rows:
+            ws[f"A{row_num}"] = display_name
 
-        for cat_code, pl_row in income_categories:
-            row += 1
-            mapping = mapping_by_code.get(cat_code)
-            summary = summary_by_category.get(cat_code)
-
-            ws.cell(row=row, column=1, value=pl_row)
-            ws.cell(row=row, column=2, value=mapping.display_name if mapping else cat_code)
-
-            if summary and summary.gross_amount:
-                amount = float(abs(summary.gross_amount))
-                ref = self.sheet_references.get(cat_code)
-
-                if ref:
-                    ws.cell(row=row, column=3, value=f"={ref}").style = "income"
-                    ws.cell(row=row, column=5, value=ref)
-                else:
-                    ws.cell(row=row, column=3, value=amount).style = "income"
-
-                ws.cell(row=row, column=4, value=mapping.default_source if mapping else "BS")
+            if category_code == "consulting_accounting":
+                # Fixed accounting fee
+                ws[f"C{row_num}"] = 862.50
+                ws[f"D{row_num}"] = "AF"
+            elif category_code == "interest":
+                # Link to interest workings
+                ws[f"C{row_num}"] = f"=K47"
+                ws[f"D{row_num}"] = "IW"
             else:
-                ws.cell(row=row, column=3, value=0).style = "currency"
-                ws.cell(row=row, column=4, value="-")
+                # Get from summaries
+                summary = summary_by_category.get(category_code)
+                if summary:
+                    ws[f"C{row_num}"] = float(abs(summary.deductible_amount or summary.gross_amount or 0))
+                    mapping = mapping_by_code.get(category_code)
+                    ws[f"D{row_num}"] = mapping.default_source if mapping else "BS"
+                else:
+                    ws[f"C{row_num}"] = 0
 
-        income_end_row = row
+            ws[f"C{row_num}"].style = "currency"
 
-        # Total Income
-        row += 1
-        ws.cell(row=row, column=2, value="TOTAL INCOME").font = Font(bold=True)
-        ws.cell(row=row, column=3, value=f"=SUM(C{income_start_row}:C{income_end_row})").style = "subtotal"
-        total_income_row = row
+        # Total expenses (Row 43)
+        row = 43
+        ws[f"A{row}"] = "Total Expenses"
+        ws[f"A{row}"].font = Font(bold=True)
+        ws[f"C{row}"] = f"=SUM(C12:C41)"
+        ws[f"C{row}"].style = "total"
 
-        # EXPENSES Section
-        row += 2
-        ws.cell(row=row, column=2, value="EXPENSES").style = "section"
-        ws.merge_cells(f"B{row}:E{row}")
+        # Net income (Row 44)
+        row = 44
+        ws[f"A{row}"] = "Net Income"
+        ws[f"A{row}"].font = Font(bold=True)
+        ws[f"C{row}"] = f"=C9-C43"
+        ws[f"C{row}"].style = "total"
 
-        expense_categories = [
-            ("agent_fees", 13),
-            ("advertising", 14),
-            ("bank_fees", 15),
-            ("body_corporate", 16),
-            ("consulting_accounting", 17),
-            ("depreciation", 18),
-            ("due_diligence", 19),
-            ("electricity", 20),
-            ("gas", 21),
-            ("gardening", 22),
-            ("healthy_homes", 23),
-            ("hire_purchase", 24),
-            ("insurance", 25),
-            ("interest", 26),
-            ("legal_fees", 27),
-            ("listing_fees", 28),
-            ("meth_testing", 29),
-            ("mileage", 30),
-            ("mortgage_admin", 31),
-            ("pest_control", 32),
-            ("postage_courier", 33),
-            ("rates", 34),
-            ("repairs_maintenance", 35),
-            ("resident_society", 36),
-            ("rubbish_collection", 37),
-            ("security", 38),
-            ("smoke_alarms", 39),
-            ("subscriptions", 40),
-            ("water_rates", 41),
+        # ===== RIGHT SIDE - INTEREST & BANK STATEMENT WORKINGS =====
+
+        # Title (Row 32)
+        ws["J32"] = "Interest Deductibility and Bank Statement Workings"
+        ws["J32"].font = Font(bold=True)
+
+        # Headers (Row 33)
+        ws["K33"] = "Loan Account 1"
+        ws["L33"] = "Loan Account 2"
+        ws["M33"] = "Loan Account 3"
+        ws["N33"] = "Rates"
+        ws["O33"] = "Insurance"
+        ws["P33"] = "Bank Fees"
+
+        # Group transactions by month and category
+        monthly_data = self._group_transactions_by_month(transactions)
+
+        # Month rows (34-45)
+        months = [
+            ("Apr-24", 34), ("May-24", 35), ("Jun-24", 36), ("Jul-24", 37),
+            ("Aug-24", 38), ("Sep-24", 39), ("Oct-24", 40), ("Nov-24", 41),
+            ("Dec-24", 42), ("Jan-25", 43), ("Feb-25", 44), ("Mar-25", 45)
         ]
 
-        expense_start_row = row + 1
+        # Adjust months based on tax year
+        if "25" in tax_return.tax_year:
+            months = [
+                ("Apr-24", 34), ("May-24", 35), ("Jun-24", 36), ("Jul-24", 37),
+                ("Aug-24", 38), ("Sep-24", 39), ("Oct-24", 40), ("Nov-24", 41),
+                ("Dec-24", 42), ("Jan-25", 43), ("Feb-25", 44), ("Mar-25", 45)
+            ]
+        elif "26" in tax_return.tax_year:
+            months = [
+                ("Apr-25", 34), ("May-25", 35), ("Jun-25", 36), ("Jul-25", 37),
+                ("Aug-25", 38), ("Sep-25", 39), ("Oct-25", 40), ("Nov-25", 41),
+                ("Dec-25", 42), ("Jan-26", 43), ("Feb-26", 44), ("Mar-26", 45)
+            ]
 
-        for cat_code, pl_row in expense_categories:
+        for month_str, row_num in months:
+            ws[f"I{row_num}"] = month_str
+            ws[f"J{row_num}"] = "BS"
+
+            # Interest (loan columns K, L, M)
+            if month_str in monthly_data and "interest" in monthly_data[month_str]:
+                ws[f"K{row_num}"] = float(monthly_data[month_str]["interest"])
+                ws[f"K{row_num}"].style = "currency"
+
+            # Rates (column N)
+            if month_str in monthly_data and "rates" in monthly_data[month_str]:
+                ws[f"N{row_num}"] = float(monthly_data[month_str]["rates"])
+                ws[f"N{row_num}"].style = "currency"
+
+            # Insurance (column O)
+            if month_str in monthly_data and "insurance" in monthly_data[month_str]:
+                ws[f"O{row_num}"] = float(monthly_data[month_str]["insurance"])
+                ws[f"O{row_num}"].style = "currency"
+
+            # Bank fees (column P)
+            if month_str in monthly_data and "bank_fees" in monthly_data[month_str]:
+                ws[f"P{row_num}"] = float(monthly_data[month_str]["bank_fees"])
+                ws[f"P{row_num}"].style = "currency"
+
+        # Totals (Row 46)
+        row = 46
+        ws[f"K{row}"] = f"=SUM(K34:K45)"
+        ws[f"L{row}"] = f"=SUM(L34:L45)"
+        ws[f"M{row}"] = f"=SUM(M34:M45)"
+        ws[f"N{row}"] = f"=SUM(N34:N45)"
+        ws[f"O{row}"] = f"=SUM(O34:O45)"
+        ws[f"P{row}"] = f"=SUM(P34:P45)"
+        for col in ["K", "L", "M", "N", "O", "P"]:
+            ws[f"{col}{row}"].style = "total"
+
+        # Deductible (Row 47)
+        row = 47
+        ws[f"J{row}"] = "Deductible"
+        deductible_rate = interest_deductibility / 100
+        ws[f"K{row}"] = f"=K46*{deductible_rate}"
+        ws[f"L{row}"] = f"=L46*{deductible_rate}"
+        ws[f"M{row}"] = f"=M46*{deductible_rate}"
+        for col in ["K", "L", "M"]:
+            ws[f"{col}{row}"].style = "currency"
+
+        # Capitalised Interest (Row 48)
+        row = 48
+        ws[f"J{row}"] = "Capitalised Interest"
+        ws[f"K{row}"] = f"=K46-K47"
+        ws[f"L{row}"] = f"=L46-L47"
+        ws[f"M{row}"] = f"=M46-M47"
+        for col in ["K", "L", "M"]:
+            ws[f"{col}{row}"].style = "currency"
+
+        # ===== PROPERTY MANAGER STATEMENTS (Rows 50-64) =====
+
+        row = 50
+        ws[f"J{row}"] = "Property Manager Statements"
+        ws[f"J{row}"].font = Font(bold=True)
+
+        # Headers (Row 51)
+        row = 51
+        ws[f"K{row}"] = "Rental Income"
+        ws[f"L{row}"] = "Agent Fees"
+        ws[f"M{row}"] = "Repairs"
+
+        # Monthly PM data (Rows 52-63)
+        pm_start_row = 52
+        for month_str, row_num in [(m, r+18) for m, r in months]:  # Offset by 18 from interest rows
+            if row_num > 63:
+                break
+            ws[f"I{row_num}"] = month_str
+            ws[f"J{row_num}"] = "PM"
+
+            # Add PM data if available
+            if month_str in monthly_data:
+                if "rental_income_pm" in monthly_data[month_str]:
+                    ws[f"K{row_num}"] = float(monthly_data[month_str]["rental_income_pm"])
+                    ws[f"K{row_num}"].style = "currency"
+                if "agent_fees" in monthly_data[month_str]:
+                    ws[f"L{row_num}"] = float(monthly_data[month_str]["agent_fees"])
+                    ws[f"L{row_num}"].style = "currency"
+                if "repairs_pm" in monthly_data[month_str]:
+                    ws[f"M{row_num}"] = float(monthly_data[month_str]["repairs_pm"])
+                    ws[f"M{row_num}"].style = "currency"
+
+        # PM Totals (Row 64)
+        row = 64
+        ws[f"K{row}"] = f"=SUM(K52:K63)"
+        ws[f"L{row}"] = f"=SUM(L52:L63)"
+        ws[f"M{row}"] = f"=SUM(M52:M63)"
+        for col in ["K", "L", "M"]:
+            ws[f"{col}{row}"].style = "total"
+
+        # ===== BOTTOM LEFT - DETAIL SECTIONS =====
+
+        # Repairs and Maintenance (Row 50+)
+        row = 50
+        ws[f"A{row}"] = "Repairs and Maintenance"
+        ws[f"A{row}"].font = Font(bold=True)
+        ws[f"B{row}"] = "Amount"
+        ws[f"C{row}"] = "Date"
+        ws[f"D{row}"] = "Invoice"
+
+        repairs_txns = [t for t in transactions if t.category_code == "repairs_maintenance"]
+        repairs_txns.sort(key=lambda t: t.transaction_date)
+
+        for i, txn in enumerate(repairs_txns[:5]):  # Show first 5
             row += 1
-            mapping = mapping_by_code.get(cat_code)
-            summary = summary_by_category.get(cat_code)
+            ws[f"A{row}"] = txn.description[:30] if txn.description else ""
+            ws[f"B{row}"] = float(abs(txn.amount))
+            ws[f"B{row}"].style = "currency"
+            ws[f"C{row}"] = txn.transaction_date
+            ws[f"C{row}"].style = "date_style"
+            ws[f"D{row}"] = "Y" if txn.has_receipt else "N"
 
-            ws.cell(row=row, column=1, value=pl_row)
-            ws.cell(row=row, column=2, value=mapping.display_name if mapping else cat_code)
+        # Capital items (Row 56+)
+        row = 56
+        ws[f"A{row}"] = "Capital"
+        ws[f"A{row}"].font = Font(bold=True)
+        ws[f"B{row}"] = "Amount"
+        ws[f"C{row}"] = "Date"
+        ws[f"D{row}"] = "Invoice"
 
-            # Special handling
-            if cat_code == "consulting_accounting":
-                ws.cell(row=row, column=3, value=float(accounting_fee)).style = "expense"
-                ws.cell(row=row, column=4, value="AF")
-                ws.cell(row=row, column=5, value="Standard fee").style = "note"
+        capital_txns = [t for t in transactions if t.category_code in ["capital", "assets_over_500"]]
+        for i, txn in enumerate(capital_txns[:3]):  # Show first 3
+            row += 1
+            ws[f"A{row}"] = txn.description[:30] if txn.description else ""
+            ws[f"B{row}"] = float(abs(txn.amount))
+            ws[f"B{row}"].style = "currency"
+            ws[f"C{row}"] = txn.transaction_date
+            ws[f"C{row}"].style = "date_style"
+            ws[f"D{row}"] = "Y" if txn.has_receipt else "N"
 
-            elif cat_code == "interest":
-                ref = self.sheet_references.get("interest_deductible")
-                if ref:
-                    ws.cell(row=row, column=3, value=f"={ref}").style = "expense"
-                    ws.cell(row=row, column=5, value=ref)
-                elif summary:
-                    ws.cell(row=row, column=3, value=float(abs(summary.deductible_amount or 0))).style = "expense"
-                else:
-                    ws.cell(row=row, column=3, value=0).style = "currency"
+        # Notes (Row 64)
+        row = 64
+        ws[f"A{row}"] = "Notes:"
+        ws[f"A{row}"].font = Font(bold=True)
 
-                ws.cell(row=row, column=4, value="IW")
-                if interest_deductibility < 100:
-                    note = f"{interest_deductibility}% deductible"
-                else:
-                    note = "100% deductible"
-                ws.cell(row=row, column=5, value=note).style = "note"
+        # Information Source Key (Rows 70-78)
+        row = 70
+        ws[f"A{row}"] = "Information Source Key"
+        ws[f"A{row}"].font = Font(bold=True)
 
-            elif cat_code == "agent_fees":
-                ref = self.sheet_references.get("agent_fees")
-                if ref:
-                    ws.cell(row=row, column=3, value=f"={ref}").style = "expense"
-                    ws.cell(row=row, column=5, value=ref)
-                elif summary:
-                    ws.cell(row=row, column=3, value=float(abs(summary.deductible_amount or summary.gross_amount))).style = "expense"
-                else:
-                    ws.cell(row=row, column=3, value=0).style = "currency"
-                ws.cell(row=row, column=4, value="PM")
+        source_codes = [
+            (71, "Additional Information", "AI"),
+            (72, "Accounting Fee", "AF"),
+            (73, "Bank Statement", "BS"),
+            (74, "Client Provided", "CP"),
+            (75, "Invoice/Receipt", "INV"),
+            (76, "Inland Revenue", "IR"),
+            (77, "Property Manager", "PM"),
+            (78, "Settlement Statement", "SS"),
+        ]
 
-            elif summary and (summary.deductible_amount or summary.gross_amount):
-                amount = float(abs(summary.deductible_amount or summary.gross_amount))
-                ref = self.sheet_references.get(cat_code)
+        for row_num, description, code in source_codes:
+            ws[f"A{row_num}"] = description
+            ws[f"B{row_num}"] = code
 
-                if ref:
-                    ws.cell(row=row, column=3, value=f"={ref}").style = "expense"
-                    ws.cell(row=row, column=5, value=ref)
-                else:
-                    ws.cell(row=row, column=3, value=amount).style = "expense"
+    def _build_ird_sheet(self, ws: Worksheet, context: Dict[str, Any]):
+        """Build the IRD checklist sheet."""
 
-                ws.cell(row=row, column=4, value=mapping.default_source if mapping else "BS")
-            else:
-                ws.cell(row=row, column=3, value=0).style = "currency"
-                ws.cell(row=row, column=4, value="-")
-
-        expense_end_row = row
-
-        # Total Expenses
-        row += 1
-        ws.cell(row=row, column=2, value="TOTAL EXPENSES").font = Font(bold=True)
-        ws.cell(row=row, column=3, value=f"=SUM(C{expense_start_row}:C{expense_end_row})").style = "subtotal"
-        total_expense_row = row
-
-        # Net Profit/Loss
-        row += 2
-        ws.cell(row=row, column=2, value="NET RENTAL INCOME / (LOSS)").font = Font(bold=True, size=12)
-        ws.cell(row=row, column=3, value=f"=C{total_income_row}-C{total_expense_row}")
-        ws.cell(row=row, column=3).style = "total"
-        ws.cell(row=row, column=3).font = Font(bold=True, size=12)
-
-        # Footer
-        row += 3
-        ws.cell(row=row, column=2, value=f"Generated: {datetime.now().strftime('%d/%m/%Y %H:%M')}").style = "note"
-        row += 1
-        ws.cell(row=row, column=2, value="Source Codes: BS=Bank Statement, PM=Property Manager, IW=Interest Workings, AF=Accounting Fee, SS=Settlement").style = "note"
-
-    def _build_rental_bs_sheet(self, ws: Worksheet, context: Dict[str, Any]):
-        """Build the Rental Bank Statement sheet."""
-        transactions = context["transactions"]
-        pl_mappings = context["pl_mappings"]
-
-        # Filter and sort
-        bs_transactions = [t for t in transactions
-                         if t.category_code and t.category_code not in ["unknown"]]
-        bs_transactions.sort(key=lambda t: t.transaction_date)
-
-        mapping_by_code = {m.category_code: m for m in pl_mappings}
+        ws.column_dimensions["A"].width = 60
+        ws.column_dimensions["B"].width = 15
+        ws.column_dimensions["C"].width = 40
 
         # Title
-        ws["A1"] = "RENTAL BANK STATEMENT - CODED TRANSACTIONS"
-        ws["A1"].font = Font(bold=True, size=14, color="1F4E79")
-        ws.merge_cells("A1:G1")
+        ws["A1"] = "IRD CHECKLIST"
+        ws["A1"].font = Font(bold=True, size=14)
 
         # Headers
         row = 3
-        headers = ["Date", "Description", "Debit", "Credit", "Balance", "Category", "Code"]
-        col_widths = [12, 45, 12, 12, 12, 25, 15]
+        ws[f"A{row}"] = "Question"
+        ws[f"B{row}"] = "Answer"
+        ws[f"C{row}"] = "Notes"
+        for col in ["A", "B", "C"]:
+            ws[f"{col}{row}"].font = Font(bold=True)
 
-        for col, (header, width) in enumerate(zip(headers, col_widths), 1):
-            ws.cell(row=row, column=col, value=header).style = "header"
-            ws.column_dimensions[get_column_letter(col)].width = width
-
-        # Transactions
-        start_row = row + 1
-        for txn in bs_transactions:
-            row += 1
-            mapping = mapping_by_code.get(txn.category_code)
-
-            ws.cell(row=row, column=1, value=txn.transaction_date).style = "date_style"
-            ws.cell(row=row, column=2, value=txn.description[:45] if txn.description else "")
-
-            if txn.amount < 0:
-                ws.cell(row=row, column=3, value=float(abs(txn.amount))).style = "currency"
-            else:
-                ws.cell(row=row, column=4, value=float(txn.amount)).style = "currency"
-
-            if txn.balance:
-                ws.cell(row=row, column=5, value=float(txn.balance)).style = "currency"
-
-            ws.cell(row=row, column=6, value=mapping.display_name if mapping else txn.category_code)
-            ws.cell(row=row, column=7, value=txn.category_code)
-
-        end_row = row
-
-        # Summary section
-        row += 3
-        ws.cell(row=row, column=1, value="CATEGORY SUMMARY").style = "section"
-        ws.merge_cells(f"A{row}:E{row}")
-
-        row += 1
-        for col, header in enumerate(["Category", "P&L Row", "Debit Total", "Credit Total", "Count"], 1):
-            ws.cell(row=row, column=col, value=header).style = "subheader"
-
-        # Group by category
-        from collections import defaultdict
-        category_totals = defaultdict(lambda: {"debit": Decimal("0"), "credit": Decimal("0"), "count": 0})
-
-        for txn in bs_transactions:
-            if txn.amount < 0:
-                category_totals[txn.category_code]["debit"] += abs(txn.amount)
-            else:
-                category_totals[txn.category_code]["credit"] += txn.amount
-            category_totals[txn.category_code]["count"] += 1
-
-        summary_start_row = row + 1
-
-        for cat_code in sorted(category_totals.keys()):
-            row += 1
-            data = category_totals[cat_code]
-            mapping = mapping_by_code.get(cat_code)
-
-            ws.cell(row=row, column=1, value=mapping.display_name if mapping else cat_code)
-            ws.cell(row=row, column=2, value=mapping.pl_row if mapping else "")
-            ws.cell(row=row, column=3, value=float(data["debit"])).style = "currency"
-            ws.cell(row=row, column=4, value=float(data["credit"])).style = "currency"
-            ws.cell(row=row, column=5, value=data["count"])
-
-            # Store reference for P&L
-            if mapping and mapping.pl_row:
-                if mapping.transaction_type == "income":
-                    self.sheet_references[cat_code] = f"'Rental BS'!D{row}"
-                else:
-                    self.sheet_references[cat_code] = f"'Rental BS'!C{row}"
-
-    def _build_interest_sheet(self, ws: Worksheet, context: Dict[str, Any]):
-        """Build the Interest Workings sheet."""
-        tax_return = context["tax_return"]
-        transactions = context["transactions"]
-        interest_deductibility = context["interest_deductibility"]
-
-        interest_txns = [t for t in transactions if t.category_code == "interest"]
-        interest_txns.sort(key=lambda t: t.transaction_date)
-
-        # Title
-        ws["A1"] = "INTEREST WORKINGS"
-        ws["A1"].font = Font(bold=True, size=14, color="1F4E79")
-
-        ws.column_dimensions["A"].width = 25
-        ws.column_dimensions["B"].width = 15
-        ws.column_dimensions["C"].width = 15
-        ws.column_dimensions["D"].width = 35
-
-        # Summary box
-        ws["A3"] = "SUMMARY"
-        ws["A3"].style = "section"
-        ws.merge_cells("A3:D3")
-
-        gross_interest = sum(abs(t.amount) for t in interest_txns)
-        deductible_interest = gross_interest * Decimal(str(interest_deductibility / 100))
-        capitalised_interest = gross_interest - deductible_interest
-
-        ws["A4"] = "Gross Interest"
-        ws["B4"] = float(gross_interest)
-        ws["B4"].style = "currency"
-        ws["C4"] = "=SUM(C:C)"  # Formula reference
-        ws["D4"] = "Total from transaction detail below"
-        ws["D4"].style = "note"
-
-        ws["A5"] = "Deductible Percentage"
-        ws["B5"] = interest_deductibility / 100
-        ws["B5"].style = "percent"
-        prop_type = "New Build" if tax_return.property_type.value == "new_build" else "Existing"
-        ws["D5"] = f"{prop_type} - {tax_return.tax_year}"
-        ws["D5"].style = "note"
-
-        ws["A6"] = "Deductible Interest"
-        ws["B6"] = f"=B4*B5"
-        ws["B6"].style = "currency"
-        ws["D6"] = "→ P&L Row 26"
-        ws["D6"].font = Font(bold=True, color="006400")
-
-        # Store reference for P&L
-        self.sheet_references["interest_deductible"] = "'Interest Workings'!B6"
-
-        ws["A7"] = "Capitalised Interest"
-        ws["B7"] = f"=B4-B6"
-        ws["B7"].style = "currency"
-        ws["D7"] = "Non-deductible portion (add to cost base)"
-        ws["D7"].style = "note"
-
-        # Monthly breakdown
-        row = 9
-        ws.cell(row=row, column=1, value="MONTHLY BREAKDOWN").style = "section"
-        ws.merge_cells(f"A{row}:D{row}")
-
-        row += 1
-        for col, header in enumerate(["Month", "# Charges", "Gross Amount", "Deductible"], 1):
-            ws.cell(row=row, column=col, value=header).style = "subheader"
-
-        # Group by month
-        from collections import defaultdict
-        monthly = defaultdict(lambda: {"amount": Decimal("0"), "count": 0})
-
-        for txn in interest_txns:
-            month_key = txn.transaction_date.strftime("%b-%y")
-            monthly[month_key]["amount"] += abs(txn.amount)
-            monthly[month_key]["count"] += 1
-
-        def month_sort_key(month_str):
-            return datetime.strptime(month_str, "%b-%y")
-
-        monthly_start = row + 1
-        for month_key in sorted(monthly.keys(), key=month_sort_key):
-            row += 1
-            data = monthly[month_key]
-
-            ws.cell(row=row, column=1, value=month_key)
-            ws.cell(row=row, column=2, value=data["count"])
-            ws.cell(row=row, column=3, value=float(data["amount"])).style = "currency"
-            ws.cell(row=row, column=4, value=f"=C{row}*$B$5").style = "currency"
-
-        monthly_end = row
-
-        # Totals
-        row += 1
-        ws.cell(row=row, column=1, value="TOTAL").font = Font(bold=True)
-        ws.cell(row=row, column=2, value=f"=SUM(B{monthly_start}:B{monthly_end})")
-        ws.cell(row=row, column=3, value=f"=SUM(C{monthly_start}:C{monthly_end})").style = "total"
-        ws.cell(row=row, column=4, value=f"=SUM(D{monthly_start}:D{monthly_end})").style = "total"
-
-        # Transaction detail
-        row += 3
-        ws.cell(row=row, column=1, value="TRANSACTION DETAIL").style = "section"
-        ws.merge_cells(f"A{row}:D{row}")
-
-        row += 1
-        for col, header in enumerate(["Date", "Description", "Amount", "Running Total"], 1):
-            ws.cell(row=row, column=col, value=header).style = "subheader"
-
-        detail_start = row + 1
-        running_total = Decimal("0")
-
-        for txn in interest_txns:
-            row += 1
-            running_total += abs(txn.amount)
-
-            ws.cell(row=row, column=1, value=txn.transaction_date).style = "date_style"
-            ws.cell(row=row, column=2, value=txn.description[:35] if txn.description else "")
-            ws.cell(row=row, column=3, value=float(abs(txn.amount))).style = "currency"
-            ws.cell(row=row, column=4, value=float(running_total)).style = "currency"
-
-        # Note
-        row += 2
-        if len(interest_txns) >= 20:
-            ws.cell(row=row, column=1, value=f"Note: {len(interest_txns)} charges detected - likely bi-weekly interest").style = "note"
-        else:
-            ws.cell(row=row, column=1, value=f"Note: {len(interest_txns)} interest charges in period").style = "note"
-
-    def _build_pm_sheet(self, ws: Worksheet, context: Dict[str, Any]):
-        """Build the Property Manager Statements sheet."""
-        transactions = context["transactions"]
-        pl_mappings = context["pl_mappings"]
-        summaries = context["summaries"]
-
-        mapping_by_code = {m.category_code: m for m in pl_mappings}
-
-        # Title
-        ws["A1"] = "PROPERTY MANAGER STATEMENTS"
-        ws["A1"].font = Font(bold=True, size=14, color="1F4E79")
-        ws.merge_cells("A1:E1")
-
-        ws.column_dimensions["A"].width = 25
-        ws.column_dimensions["B"].width = 15
-        ws.column_dimensions["C"].width = 15
-        ws.column_dimensions["D"].width = 12
-        ws.column_dimensions["E"].width = 30
-
-        # Summary
-        ws["A3"] = "SUMMARY"
-        ws["A3"].style = "section"
-        ws.merge_cells("A3:E3")
-
-        # Get PM-related categories
-        pm_categories = ["rental_income", "agent_fees", "advertising", "listing_fees",
-                        "repairs_maintenance", "gardening", "pest_control"]
+        # Questions
+        questions = [
+            "1. Checked WFM/Client File for Notes/Email Correspondence?",
+            "2. Checked Account Look Up?",
+            "3. Are there any outstanding Income Tax returns?",
+            "4. Is there any outstanding Income Tax?",
+            "5. Are there any outstanding GST returns?",
+            "6. Is there any outstanding GST?",
+            "7. Were Provisional Tax Payments made on/before:",
+            "   a. 28 August",
+            "   b. 15 January",
+            "   c. 7 May",
+        ]
 
         row = 4
-        for col, header in enumerate(["Category", "P&L Row", "Amount", "Source"], 1):
-            ws.cell(row=row, column=col, value=header).style = "subheader"
-
-        summary_by_cat = {s.category_code: s for s in summaries}
-
-        for cat_code in pm_categories:
-            summary = summary_by_cat.get(cat_code)
-            if summary and (summary.gross_amount or summary.deductible_amount):
-                row += 1
-                mapping = mapping_by_code.get(cat_code)
-
-                ws.cell(row=row, column=1, value=mapping.display_name if mapping else cat_code)
-                ws.cell(row=row, column=2, value=mapping.pl_row if mapping else "")
-
-                amount = summary.deductible_amount or summary.gross_amount
-                ws.cell(row=row, column=3, value=float(abs(amount))).style = "currency"
-                ws.cell(row=row, column=4, value="PM/BS")
-
-                # Store reference for agent fees
-                if cat_code == "agent_fees":
-                    self.sheet_references["agent_fees"] = f"'PM Statements'!C{row}"
-
-        # PM Transaction Detail
-        pm_txns = [t for t in transactions if t.category_code in pm_categories]
-        pm_txns.sort(key=lambda t: t.transaction_date)
-
-        if pm_txns:
-            row += 3
-            ws.cell(row=row, column=1, value="TRANSACTION DETAIL").style = "section"
-            ws.merge_cells(f"A{row}:E{row}")
-
+        for question in questions:
+            ws[f"A{row}"] = question
+            ws[f"B{row}"] = ""  # Empty for user to fill
+            ws[f"C{row}"] = ""  # Empty for user to fill
             row += 1
-            for col, header in enumerate(["Date", "Description", "Amount", "Category"], 1):
-                ws.cell(row=row, column=col, value=header).style = "subheader"
 
-            for txn in pm_txns:
-                row += 1
-                mapping = mapping_by_code.get(txn.category_code)
+        # Add some space and notes section
+        row += 2
+        ws[f"A{row}"] = "Additional Notes:"
+        ws[f"A{row}"].font = Font(bold=True)
 
-                ws.cell(row=row, column=1, value=txn.transaction_date).style = "date_style"
-                ws.cell(row=row, column=2, value=txn.description[:40] if txn.description else "")
-                ws.cell(row=row, column=3, value=float(txn.amount)).style = "currency_neg"
-                ws.cell(row=row, column=4, value=mapping.display_name if mapping else txn.category_code)
+    def _group_transactions_by_month(self, transactions: List[Transaction]) -> Dict[str, Dict[str, Decimal]]:
+        """Group transactions by month and category for the workings sections."""
+        monthly_data = defaultdict(lambda: defaultdict(Decimal))
 
-        # Notes
-        row += 3
-        ws.cell(row=row, column=1, value="Notes:").font = Font(bold=True)
-        row += 1
-        ws.cell(row=row, column=1, value="• Gross rent from PM statements should match bank deposits").style = "note"
-        row += 1
-        ws.cell(row=row, column=1, value="• Management fees typically 7-10% of gross rent").style = "note"
-        row += 1
-        ws.cell(row=row, column=1, value="• Verify repairs are deductible (not capital improvements)").style = "note"
+        for txn in transactions:
+            if not txn.transaction_date or not txn.category_code:
+                continue
 
-    def _build_settlement_sheet(self, ws: Worksheet, context: Dict[str, Any]):
-        """Build the Settlement sheet for Year 1."""
-        tax_return = context["tax_return"]
-        transactions = context["transactions"]
+            # Format month as "Mon-YY" (e.g., "Apr-24")
+            month_key = txn.transaction_date.strftime("%b-%y")
 
-        settlement_txns = [t for t in transactions
-                         if hasattr(t, 'raw_data') and t.raw_data and t.raw_data.get("source") == "settlement"]
+            # Group by relevant categories
+            if txn.category_code == "interest":
+                monthly_data[month_key]["interest"] += abs(txn.amount)
+            elif txn.category_code == "rates":
+                monthly_data[month_key]["rates"] += abs(txn.amount)
+            elif txn.category_code == "insurance":
+                monthly_data[month_key]["insurance"] += abs(txn.amount)
+            elif txn.category_code == "bank_fees":
+                monthly_data[month_key]["bank_fees"] += abs(txn.amount)
+            elif txn.category_code == "rental_income":
+                # Check if from PM
+                if hasattr(txn, 'source') and txn.source == "PM":
+                    monthly_data[month_key]["rental_income_pm"] += abs(txn.amount)
+            elif txn.category_code == "agent_fees":
+                monthly_data[month_key]["agent_fees"] += abs(txn.amount)
+            elif txn.category_code == "repairs_maintenance":
+                # Check if from PM
+                if hasattr(txn, 'source') and txn.source == "PM":
+                    monthly_data[month_key]["repairs_pm"] += abs(txn.amount)
 
-        # Title
-        ws["A1"] = "SETTLEMENT STATEMENT WORKINGS"
-        ws["A1"].font = Font(bold=True, size=14, color="1F4E79")
-
-        ws["A2"] = f"Property: {tax_return.property_address}"
-        ws["A3"] = "Year of Ownership: 1 (First Year)"
-
-        ws.column_dimensions["A"].width = 30
-        ws.column_dimensions["B"].width = 15
-        ws.column_dimensions["C"].width = 12
-        ws.column_dimensions["D"].width = 35
-
-        # Apportionments
-        row = 5
-        ws.cell(row=row, column=1, value="SETTLEMENT APPORTIONMENTS").style = "section"
-        ws.merge_cells(f"A{row}:D{row}")
-
-        row += 1
-        for col, header in enumerate(["Item", "Amount", "P&L Row", "Notes"], 1):
-            ws.cell(row=row, column=col, value=header).style = "subheader"
-
-        # Expected items
-        items = {
-            "rates_apportionment": {"name": "Rates Apportionment", "pl_row": 34, "amount": Decimal("0")},
-            "rates_vendor_credit": {"name": "Rates Vendor Credit", "pl_row": 34, "amount": Decimal("0"), "note": "Subtract from rates"},
-            "body_corporate": {"name": "Body Corporate (Operating)", "pl_row": 16, "amount": Decimal("0")},
-            "resident_society": {"name": "Resident Society", "pl_row": 36, "amount": Decimal("0")},
-            "water_rates": {"name": "Water Rates", "pl_row": 41, "amount": Decimal("0")},
-            "legal_fees": {"name": "Legal Fees", "pl_row": 27, "amount": Decimal("0")},
-            "interest_on_deposit": {"name": "Interest on Deposit", "pl_row": 26, "amount": Decimal("0"), "note": "Credit against interest"},
-        }
-
-        for txn in settlement_txns:
-            if hasattr(txn, 'raw_data') and txn.raw_data:
-                txn_type = txn.raw_data.get("type", "")
-                if txn_type in items:
-                    items[txn_type]["amount"] = abs(txn.amount)
-
-        for key, item in items.items():
-            if item["amount"] > 0:
-                row += 1
-                ws.cell(row=row, column=1, value=item["name"])
-                ws.cell(row=row, column=2, value=float(item["amount"])).style = "currency"
-                ws.cell(row=row, column=3, value=item["pl_row"])
-                if "note" in item:
-                    ws.cell(row=row, column=4, value=item["note"]).style = "note"
-
-        # Rates calculation
-        row += 3
-        ws.cell(row=row, column=1, value="RATES CALCULATION (Year 1)").style = "section"
-        ws.merge_cells(f"A{row}:D{row}")
-
-        rates_apport = items["rates_apportionment"]["amount"]
-        vendor_credit = items["rates_vendor_credit"]["amount"]
-
-        bs_rates = sum(abs(t.amount) for t in transactions
-                      if t.category_code == "rates"
-                      and (not hasattr(t, 'raw_data') or not t.raw_data or t.raw_data.get("source") != "settlement"))
-
-        row += 1
-        ws.cell(row=row, column=1, value="Settlement Apportionment")
-        ws.cell(row=row, column=2, value=float(rates_apport)).style = "currency"
-
-        row += 1
-        ws.cell(row=row, column=1, value="+ Bank Statement Instalments")
-        ws.cell(row=row, column=2, value=float(bs_rates)).style = "currency"
-
-        row += 1
-        ws.cell(row=row, column=1, value="- Vendor Credit")
-        ws.cell(row=row, column=2, value=float(vendor_credit)).style = "currency"
-
-        row += 1
-        total_rates = rates_apport + bs_rates - vendor_credit
-        ws.cell(row=row, column=1, value="= TOTAL RATES").font = Font(bold=True)
-        ws.cell(row=row, column=2, value=float(total_rates)).style = "total"
-        ws.cell(row=row, column=3, value="Row 34")
-
-        # Store reference
-        self.sheet_references["rates"] = f"'Settlement'!B{row}"
-
-    def _build_depreciation_sheet(self, ws: Worksheet, context: Dict[str, Any]):
-        """Build the Depreciation sheet."""
-        tax_return = context["tax_return"]
-        summaries = context["summaries"]
-
-        dep_summary = next((s for s in summaries if s.category_code == "depreciation"), None)
-
-        # Title
-        ws["A1"] = "DEPRECIATION WORKINGS"
-        ws["A1"].font = Font(bold=True, size=14, color="1F4E79")
-
-        ws.column_dimensions["A"].width = 30
-        ws.column_dimensions["B"].width = 15
-        ws.column_dimensions["C"].width = 15
-        ws.column_dimensions["D"].width = 30
-
-        # Property info
-        ws["A3"] = "Property:"
-        ws["B3"] = tax_return.property_address
-        ws["A4"] = "Tax Year:"
-        ws["B4"] = tax_return.tax_year
-        ws["A5"] = "Year of Ownership:"
-        ws["B5"] = tax_return.year_of_ownership
-
-        for cell in ["A3", "A4", "A5"]:
-            ws[cell].font = Font(bold=True)
-
-        # Depreciation summary
-        row = 7
-        ws.cell(row=row, column=1, value="CHATTELS DEPRECIATION").style = "section"
-        ws.merge_cells(f"A{row}:D{row}")
-
-        if dep_summary:
-            row += 2
-            ws.cell(row=row, column=1, value="Full Year Depreciation")
-            ws.cell(row=row, column=2, value=float(abs(dep_summary.gross_amount))).style = "currency"
-            ws.cell(row=row, column=3, value="From Chattel Pack")
-
-            if tax_return.year_of_ownership == 1:
-                row += 2
-                ws.cell(row=row, column=1, value="PRO-RATA CALCULATION").style = "section"
-                ws.merge_cells(f"A{row}:D{row}")
-
-                row += 1
-                ws.cell(row=row, column=1, value="Formula:")
-                ws.cell(row=row, column=2, value="Full Year × (Months ÷ 12)")
-
-                row += 1
-                ws.cell(row=row, column=1, value="Months Owned:")
-                ws.cell(row=row, column=2, value="[Enter months from settlement to 31 March]")
-
-                row += 1
-                ws.cell(row=row, column=1, value="Pro-rated Amount:")
-                ws.cell(row=row, column=2, value="=B9*(B12/12)").style = "currency"
-
-            row += 2
-            ws.cell(row=row, column=1, value="Deductible Depreciation").font = Font(bold=True)
-            ws.cell(row=row, column=2, value=float(abs(dep_summary.deductible_amount or dep_summary.gross_amount))).style = "total"
-            ws.cell(row=row, column=3, value="→ P&L Row 18").font = Font(bold=True, color="006400")
-
-            # Store reference
-            self.sheet_references["depreciation"] = f"'Depreciation'!B{row}"
-        else:
-            row += 2
-            ws.cell(row=row, column=1, value="No depreciation data found").style = "note"
-            ws.cell(row=row, column=2, value="Upload Chattel Pack to calculate")
+        return dict(monthly_data)
 
     async def _load_tax_return(self, db: AsyncSession, tax_return_id: UUID) -> TaxReturn:
         """Load tax return with client."""
@@ -940,9 +621,10 @@ class WorkbookGenerator:
         return list(result.scalars().all())
 
     async def _load_summaries(self, db: AsyncSession, tax_return_id: UUID) -> List[TransactionSummary]:
-        """Load transaction summaries."""
+        """Load transaction summaries with category mappings."""
         result = await db.execute(
             select(TransactionSummary)
+            .options(selectinload(TransactionSummary.category_mapping))
             .where(TransactionSummary.tax_return_id == tax_return_id)
         )
         return list(result.scalars().all())

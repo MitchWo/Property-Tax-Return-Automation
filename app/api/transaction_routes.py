@@ -538,7 +538,8 @@ async def generate_workbook(
 @transaction_router.get("/workbook/{tax_return_id}/download")
 async def download_workbook(
     tax_return_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    force_regenerate: bool = False  # Add query param to force regeneration
 ):
     """Download generated workbook."""
     from app.services.workbook_generator import get_workbook_generator
@@ -556,15 +557,44 @@ async def download_workbook(
     if not tax_return:
         raise HTTPException(status_code=404, detail="Tax return not found")
 
-    # Build filename pattern
-    client_name = tax_return.client.name.replace(" ", "_")
-    address_short = tax_return.property_address.split(",")[0].replace(" ", "_")[:20]
-    filename = f"{client_name}_{address_short}_{tax_return.tax_year}_IR3R.xlsx"
+    # Build filename pattern - must match what workbook_generator creates!
+    def _sanitize_filename(name: str) -> str:
+        return "".join(c if c.isalnum() or c in "_- " else "_" for c in name).replace(" ", "_")
+
+    client_name = _sanitize_filename(tax_return.client.name)
+    year = tax_return.tax_year[-2:]  # FY24 -> 24
+    filename = f"PTR01_-_Rental_Property_Workbook_-_{client_name}_-_{year}.xlsx"
     filepath = generator.output_dir / filename
 
-    if not filepath.exists():
-        # Generate if not exists
+    # Log what's happening
+    if filepath.exists():
+        logger.info(f"Found existing workbook at: {filepath}")
+        if force_regenerate:
+            logger.info(f"Force regeneration requested, deleting old file")
+            filepath.unlink()  # Delete the old file
+        else:
+            # Check the sheet structure of existing file
+            from openpyxl import load_workbook
+            try:
+                wb = load_workbook(filepath, read_only=True)
+                logger.info(f"Existing workbook sheets: {wb.sheetnames}")
+                wb.close()
+            except Exception as e:
+                logger.error(f"Error reading existing workbook: {e}")
+
+    if not filepath.exists() or force_regenerate:
+        logger.info(f"Generating new workbook for tax return {tax_return_id}")
+        # Generate new workbook
         filepath = await generator.generate_workbook(db, tax_return_id)
+
+        # Verify the new file
+        from openpyxl import load_workbook
+        try:
+            wb = load_workbook(filepath, read_only=True)
+            logger.info(f"Generated workbook sheets: {wb.sheetnames}")
+            wb.close()
+        except Exception as e:
+            logger.error(f"Error reading generated workbook: {e}")
 
     return FileResponse(
         path=filepath,

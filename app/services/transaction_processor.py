@@ -8,7 +8,8 @@ from uuid import UUID
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
+from decimal import Decimal
 
 from app.models.db_models import (
     Document, TaxReturn, Transaction, TransactionSummary,
@@ -18,7 +19,9 @@ from app.schemas.transactions import (
     TransactionCreate, TransactionResponse,
     TransactionSummaryResponse, ProcessingResult
 )
-from app.services.transaction_extractor import TransactionExtractor
+# Toggle between old and new extractor here
+# from app.services.transaction_extractor import TransactionExtractor  # Old code-based
+from app.services.transaction_extractor_claude import TransactionExtractorClaude as TransactionExtractor  # New Claude-based
 from app.services.transaction_categorizer import TransactionCategorizer
 from app.services.tax_rules_service import TaxRulesService
 
@@ -163,8 +166,10 @@ class TransactionProcessor:
             # Commit transactions
             await db.commit()
 
-            # Generate summary
-            summary = await self._generate_summary(db, tax_return_id)
+            # Generate summary (currently returns list of per-category summaries)
+            summaries = await self._generate_summary(db, tax_return_id)
+            # TODO: Decide how to handle multiple category summaries in ProcessingResult
+            summary = summaries[0] if summaries else None
 
             # Update document status
             document.processing_status = 'completed'
@@ -385,8 +390,10 @@ class TransactionProcessor:
             # Commit updates
             await db.commit()
 
-            # Regenerate summary
-            summary = await self._generate_summary(db, tax_return_id)
+            # Regenerate summary (currently returns list of per-category summaries)
+            summaries = await self._generate_summary(db, tax_return_id)
+            # TODO: Decide how to handle multiple category summaries in ProcessingResult
+            summary = summaries[0] if summaries else None
 
             logger.info(f"Reprocessed {len(updated_transactions)} transactions")
 
@@ -491,8 +498,8 @@ class TransactionProcessor:
         self,
         db: AsyncSession,
         tax_return_id: UUID
-    ) -> TransactionSummaryResponse:
-        """Generate or update transaction summary."""
+    ) -> List[TransactionSummaryResponse]:
+        """Generate or update transaction summaries per category."""
         try:
             # Get all transactions for tax return
             result = await db.execute(
@@ -502,63 +509,71 @@ class TransactionProcessor:
             )
             transactions = result.scalars().all()
 
-            # Calculate summary statistics
-            total_transactions = len(transactions)
-            total_amount = sum(t.amount for t in transactions)
-            categorized_count = sum(1 for t in transactions if t.category_code)
-            needs_review_count = sum(1 for t in transactions if t.needs_review)
-
-            # Category breakdown
-            category_breakdown = {}
+            # Group transactions by category
+            category_data = {}
             for transaction in transactions:
                 if transaction.category_code:
-                    if transaction.category_code not in category_breakdown:
-                        category_breakdown[transaction.category_code] = {
+                    if transaction.category_code not in category_data:
+                        category_data[transaction.category_code] = {
                             'count': 0,
-                            'total': 0,
-                            'deductible': 0
+                            'gross_amount': Decimal(0),
+                            'deductible_amount': Decimal(0),
+                            'gst_amount': Decimal(0) if transaction.gst_inclusive else None
                         }
-                    category_breakdown[transaction.category_code]['count'] += 1
-                    category_breakdown[transaction.category_code]['total'] += float(transaction.amount)
-                    category_breakdown[transaction.category_code]['deductible'] += (
-                        float(transaction.amount) * transaction.deductible_percentage / 100
-                    )
 
-            # Check for existing summary
-            result = await db.execute(
-                select(TransactionSummary).where(
+                    category_data[transaction.category_code]['count'] += 1
+                    category_data[transaction.category_code]['gross_amount'] += transaction.amount
+
+                    # Calculate deductible amount
+                    deductible = transaction.amount * Decimal(transaction.deductible_percentage) / Decimal(100)
+                    category_data[transaction.category_code]['deductible_amount'] += deductible
+
+                    # Calculate GST if applicable
+                    if transaction.gst_inclusive and category_data[transaction.category_code]['gst_amount'] is not None:
+                        gst = transaction.amount * Decimal(3) / Decimal(23)  # GST is 3/23 of GST-inclusive amount
+                        category_data[transaction.category_code]['gst_amount'] += gst
+
+            # Delete existing summaries for this tax return
+            await db.execute(
+                delete(TransactionSummary).where(
                     TransactionSummary.tax_return_id == tax_return_id
                 )
             )
-            summary = result.scalar_one_or_none()
 
-            if summary:
-                # Update existing
-                summary.total_transactions = total_transactions
-                summary.total_amount = total_amount
-                summary.categorized_count = categorized_count
-                summary.needs_review_count = needs_review_count
-                summary.category_breakdown = category_breakdown
-                summary.last_updated = datetime.utcnow()
-            else:
-                # Create new
+            # Create new summaries per category
+            summaries = []
+            for category_code, data in category_data.items():
                 summary = TransactionSummary(
                     tax_return_id=tax_return_id,
-                    total_transactions=total_transactions,
-                    total_amount=total_amount,
-                    categorized_count=categorized_count,
-                    needs_review_count=needs_review_count,
-                    category_breakdown=category_breakdown
+                    category_code=category_code,
+                    transaction_count=data['count'],
+                    gross_amount=data['gross_amount'],
+                    deductible_amount=data['deductible_amount'],
+                    gst_amount=data['gst_amount']
                 )
                 db.add(summary)
+                summaries.append(summary)
+
+            # Flush to get IDs but don't commit yet
+            await db.flush()
+
+            # Eagerly load the category_mapping relationship for all summaries
+            from sqlalchemy.orm import selectinload
+            result = await db.execute(
+                select(TransactionSummary)
+                .options(selectinload(TransactionSummary.category_mapping))
+                .where(TransactionSummary.tax_return_id == tax_return_id)
+            )
+            summaries = result.scalars().all()
 
             await db.commit()
 
-            return TransactionSummaryResponse.model_validate(summary)
+            # Return response objects using custom method to include relationship data
+            return [TransactionSummaryResponse.from_orm_with_mapping(s) for s in summaries]
 
         except Exception as e:
             logger.error(f"Error generating summary: {e}")
-            return None
+            return []
 
     async def _get_processing_result(
         self,
@@ -574,7 +589,9 @@ class TransactionProcessor:
         )
         transactions = result.scalars().all()
 
-        summary = await self._generate_summary(db, tax_return_id)
+        summaries = await self._generate_summary(db, tax_return_id)
+        # TODO: Decide how to handle multiple category summaries in ProcessingResult
+        summary = summaries[0] if summaries else None
 
         return ProcessingResult(
             success=True,

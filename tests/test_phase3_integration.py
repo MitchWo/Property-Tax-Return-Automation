@@ -346,7 +346,7 @@ class TestTransactionExtractor:
     @pytest.mark.asyncio
     async def test_parse_asb_csv(self):
         """Test parsing ASB CSV format."""
-        from app.services.transaction_extractor import TransactionExtractor
+        from app.services.transaction_extractor_claude import TransactionExtractorClaude as TransactionExtractor
 
         # Sample ASB CSV content
         csv_content = """Date,Description,Amount,Balance,Account
@@ -373,7 +373,7 @@ class TestTransactionExtractor:
     @pytest.mark.asyncio
     async def test_parse_amount_formats(self):
         """Test parsing various amount formats."""
-        from app.services.transaction_extractor import TransactionExtractor
+        from app.services.transaction_extractor_claude import TransactionExtractorClaude as TransactionExtractor
 
         extractor = TransactionExtractor()
 

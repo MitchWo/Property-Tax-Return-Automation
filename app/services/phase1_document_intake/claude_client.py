@@ -148,6 +148,30 @@ class ClaudeClient:
             logger.error(f"Error analyzing document: {e}")
             raise
 
+    async def extract_with_prompt(self, prompt: str) -> str:
+        """
+        Call Claude with a prompt and return the text response.
+
+        Args:
+            prompt: The extraction prompt
+
+        Returns:
+            Raw text response from Claude
+        """
+        try:
+            response = await self._call_with_retry(
+                lambda: self.client.messages.create(
+                    model=self.model,
+                    max_tokens=16384,  # Increased for large transaction lists (100+ transactions)
+                    temperature=0.1,  # Low temperature for consistent extraction
+                    messages=[{"role": "user", "content": prompt}]
+                )
+            )
+            return response.content[0].text
+        except Exception as e:
+            logger.error(f"Error calling Claude for extraction: {e}")
+            raise
+
     async def review_all_documents(
         self,
         documents: List[DocumentSummary],

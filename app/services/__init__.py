@@ -8,7 +8,7 @@ from app.services.transaction_categorizer import (
     TransactionCategorizer,
     get_transaction_categorizer,
 )
-from app.services.transaction_extractor import TransactionExtractor
+from app.services.transaction_extractor_claude import TransactionExtractorClaude as TransactionExtractor
 from app.services.transaction_processor import TransactionProcessor
 from app.services.workbook_generator import WorkbookGenerator, get_workbook_generator
 

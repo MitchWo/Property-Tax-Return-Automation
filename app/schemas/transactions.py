@@ -165,7 +165,7 @@ class TransactionSummaryResponse(BaseModel):
     category_code: str
     category_display_name: Optional[str] = None
     pl_row: Optional[int] = None
-    transaction_type: str
+    transaction_type: Optional[str] = None
 
     transaction_count: int
     gross_amount: Decimal
@@ -176,6 +176,30 @@ class TransactionSummaryResponse(BaseModel):
 
     created_at: datetime
     updated_at: datetime
+
+    @classmethod
+    def from_orm_with_mapping(cls, summary):
+        """Create response from ORM model with category_mapping relationship."""
+        data = {
+            'id': summary.id,
+            'tax_return_id': summary.tax_return_id,
+            'category_code': summary.category_code,
+            'transaction_count': summary.transaction_count,
+            'gross_amount': summary.gross_amount,
+            'deductible_amount': summary.deductible_amount,
+            'gst_amount': summary.gst_amount,
+            'monthly_breakdown': summary.monthly_breakdown,
+            'created_at': summary.created_at,
+            'updated_at': summary.updated_at,
+        }
+
+        # Add fields from category_mapping if available
+        if hasattr(summary, 'category_mapping') and summary.category_mapping:
+            data['category_display_name'] = summary.category_mapping.display_name
+            data['pl_row'] = summary.category_mapping.pl_row
+            data['transaction_type'] = summary.category_mapping.transaction_type
+
+        return cls(**data)
 
     class Config:
         from_attributes = True
