@@ -1,17 +1,19 @@
 """File handling service for processing uploaded documents."""
+
 import csv
+import hashlib
 import io
 import logging
 import uuid
 from pathlib import Path
-from typing import List, Optional
+from typing import Tuple
 
-import pypdf
-from fastapi import HTTPException, UploadFile
-from pdf2image import convert_from_bytes
-from PIL import Image
+import fitz  # PyMuPDF
 import openpyxl
+import pypdf
 import xlrd
+from fastapi import HTTPException, UploadFile
+from PIL import Image
 
 from app.config import settings
 from app.schemas.documents import ProcessedFile
@@ -27,11 +29,7 @@ class FileHandler:
         self.upload_dir = settings.UPLOAD_DIR
         self.max_file_size = settings.max_file_size_bytes
 
-    async def save_upload(
-        self,
-        file: UploadFile,
-        tax_return_id: str
-    ) -> tuple[str, str, int]:
+    async def save_upload(self, file: UploadFile, tax_return_id: str) -> Tuple[str, str, int, str]:
         """
         Save uploaded file to disk.
 
@@ -40,7 +38,7 @@ class FileHandler:
             tax_return_id: Tax return ID for directory organization
 
         Returns:
-            Tuple of (stored_filename, file_path, file_size)
+            Tuple of (stored_filename, file_path, file_size, content_hash)
         """
         # Validate file
         await self._validate_file(file)
@@ -50,21 +48,21 @@ class FileHandler:
         tax_return_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate unique filename
-        file_ext = Path(file.filename).suffix
         stored_filename = f"{uuid.uuid4()}_{file.filename}"
         file_path = tax_return_dir / stored_filename
 
-        # Save file
+        # Save file and compute hash
         content = await file.read()
+        content_hash = self._compute_hash(content)
         file_path.write_bytes(content)
 
-        return stored_filename, str(file_path), len(content)
+        return stored_filename, str(file_path), len(content), content_hash
 
-    async def process_file(
-        self,
-        file_path: str,
-        original_filename: str
-    ) -> ProcessedFile:
+    def _compute_hash(self, content: bytes) -> str:
+        """Compute SHA-256 hash of file content."""
+        return hashlib.sha256(content).hexdigest()
+
+    async def process_file(self, file_path: str, original_filename: str) -> ProcessedFile:
         """
         Process a saved file and extract content.
 
@@ -89,10 +87,7 @@ class FileHandler:
         elif file_ext == ".csv":
             return await self._process_csv(file_path_obj)
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported file type: {file_ext}"
-            )
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_ext}")
 
     async def _validate_file(self, file: UploadFile) -> None:
         """Validate uploaded file."""
@@ -101,14 +96,13 @@ class FileHandler:
         if file_ext not in settings.ALLOWED_EXTENSIONS:
             raise HTTPException(
                 status_code=400,
-                detail=f"File type {file_ext} not allowed. Allowed types: {settings.ALLOWED_EXTENSIONS}"
+                detail=f"File type {file_ext} not allowed. Allowed types: {settings.ALLOWED_EXTENSIONS}",
             )
 
         # Check MIME type
         if file.content_type not in settings.ALLOWED_MIME_TYPES:
             raise HTTPException(
-                status_code=400,
-                detail=f"MIME type {file.content_type} not allowed"
+                status_code=400, detail=f"MIME type {file.content_type} not allowed"
             )
 
         # Check file size
@@ -119,7 +113,7 @@ class FileHandler:
         if file_size > self.max_file_size:
             raise HTTPException(
                 status_code=400,
-                detail=f"File size ({file_size / 1024 / 1024:.1f}MB) exceeds maximum ({settings.MAX_FILE_SIZE_MB}MB)"
+                detail=f"File size ({file_size / 1024 / 1024:.1f}MB) exceeds maximum ({settings.MAX_FILE_SIZE_MB}MB)",
             )
 
     async def _process_pdf(self, file_path: Path) -> ProcessedFile:
@@ -143,9 +137,10 @@ class FileHandler:
             words = combined_text.split()
             # Scanned if: very little text, OR text looks garbled (low ratio of real words)
             is_scanned = (
-                len(combined_text.strip()) < 200 or  # Very little text
-                len(words) < 20 or  # Very few words
-                sum(1 for w in words if len(w) > 15) / max(len(words), 1) > 0.3  # Many long "words" = garbled OCR
+                len(combined_text.strip()) < 200  # Very little text
+                or len(words) < 20  # Very few words
+                or sum(1 for w in words if len(w) > 15) / max(len(words), 1)
+                > 0.3  # Many long "words" = garbled OCR
             )
 
             if is_scanned:
@@ -158,7 +153,7 @@ class FileHandler:
                 file_type="digital_pdf",
                 text_content=combined_text,
                 image_paths=None,
-                page_count=page_count
+                page_count=page_count,
             )
 
         except Exception as e:
@@ -167,37 +162,39 @@ class FileHandler:
             return await self._convert_pdf_to_images(file_path, content, 0)
 
     async def _convert_pdf_to_images(
-        self,
-        file_path: Path,
-        content: bytes,
-        page_count: int
+        self, file_path: Path, content: bytes, page_count: int
     ) -> ProcessedFile:
-        """Convert PDF pages to images."""
+        """Convert PDF pages to images using PyMuPDF."""
         try:
-            # Convert PDF to images (300 DPI for good OCR quality)
-            images = convert_from_bytes(content, dpi=300)
+            # Use PyMuPDF (fitz) - no external dependencies like poppler required
+            pdf_document = fitz.open(stream=content, filetype="pdf")
             image_paths = []
 
-            # Save each page as image
-            for i, image in enumerate(images):
-                image_path = file_path.parent / f"{file_path.stem}_page_{i+1}.png"
-                image.save(image_path, "PNG")
+            # Convert each page to image (300 DPI equivalent)
+            zoom = 300 / 72  # 72 is default PDF DPI, we want 300 DPI
+            matrix = fitz.Matrix(zoom, zoom)
+
+            for page_num in range(len(pdf_document)):
+                page = pdf_document[page_num]
+                pix = page.get_pixmap(matrix=matrix)
+
+                image_path = file_path.parent / f"{file_path.stem}_page_{page_num + 1}.png"
+                pix.save(str(image_path))
                 image_paths.append(str(image_path))
+
+            pdf_document.close()
 
             return ProcessedFile(
                 file_path=str(file_path),
                 file_type="scanned_pdf",
                 text_content=None,
                 image_paths=image_paths,
-                page_count=page_count or len(images)
+                page_count=page_count or len(image_paths),
             )
 
         except Exception as e:
             logger.error(f"Error converting PDF to images: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to process PDF file: {str(e)}"
-            )
+            raise HTTPException(status_code=500, detail=f"Failed to process PDF file: {str(e)}")
 
     async def _process_image(self, file_path: Path) -> ProcessedFile:
         """Process image file."""
@@ -211,15 +208,12 @@ class FileHandler:
                 file_type="image",
                 text_content=None,
                 image_paths=[str(file_path)],
-                page_count=1
+                page_count=1,
             )
 
         except Exception as e:
             logger.error(f"Error processing image: {e}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid image file: {str(e)}"
-            )
+            raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
 
     async def _process_excel(self, file_path: Path) -> ProcessedFile:
         """Process Excel file."""
@@ -243,15 +237,12 @@ class FileHandler:
                 file_type="spreadsheet",
                 text_content="\n".join(text_content),
                 image_paths=None,
-                page_count=len(workbook.sheetnames)
+                page_count=len(workbook.sheetnames),
             )
 
         except Exception as e:
             logger.error(f"Error processing Excel file: {e}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid Excel file: {str(e)}"
-            )
+            raise HTTPException(status_code=400, detail=f"Invalid Excel file: {str(e)}")
 
     async def _process_xls(self, file_path: Path) -> ProcessedFile:
         """Process old .xls Excel file."""
@@ -278,15 +269,12 @@ class FileHandler:
                 file_type="spreadsheet",
                 text_content="\n".join(text_content),
                 image_paths=None,
-                page_count=len(workbook.sheet_names())
+                page_count=len(workbook.sheet_names()),
             )
 
         except Exception as e:
             logger.error(f"Error processing XLS file: {e}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid XLS file: {str(e)}"
-            )
+            raise HTTPException(status_code=400, detail=f"Invalid XLS file: {str(e)}")
 
     async def _process_csv(self, file_path: Path) -> ProcessedFile:
         """Process CSV file."""
@@ -304,12 +292,9 @@ class FileHandler:
                 file_type="spreadsheet",
                 text_content="\n".join(rows),
                 image_paths=None,
-                page_count=1
+                page_count=1,
             )
 
         except Exception as e:
             logger.error(f"Error processing CSV file: {e}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid CSV file: {str(e)}"
-            )
+            raise HTTPException(status_code=400, detail=f"Invalid CSV file: {str(e)}")

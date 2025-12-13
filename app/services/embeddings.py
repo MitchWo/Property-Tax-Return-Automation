@@ -1,4 +1,5 @@
 """OpenAI embeddings service for semantic search."""
+
 import logging
 from typing import List, Optional
 
@@ -47,9 +48,7 @@ class EmbeddingsService:
                 text = text[:30000]
 
             response = await self.client.embeddings.create(
-                model=self.model,
-                input=text,
-                dimensions=self.dimensions
+                model=self.model, input=text, dimensions=self.dimensions
             )
 
             embedding = response.data[0].embedding
@@ -78,9 +77,7 @@ class EmbeddingsService:
             cleaned = [t.strip()[:30000] for t in texts]
 
             response = await self.client.embeddings.create(
-                model=self.model,
-                input=cleaned,
-                dimensions=self.dimensions
+                model=self.model, input=cleaned, dimensions=self.dimensions
             )
 
             # Sort by index to maintain order

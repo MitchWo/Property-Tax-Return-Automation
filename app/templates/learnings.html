@@ -3,15 +3,15 @@
 {% block title %}Stored Learnings - Property Tax Review{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto">
+<div class="w-full">
     <div class="bg-white shadow rounded-lg p-6">
         <div class="flex justify-between items-center mb-6">
             <div>
-                <h2 class="text-2xl font-bold text-gray-900">Stored Learnings</h2>
+                <h2 class="text-2xl font-bold text-primary">Stored Learnings</h2>
                 <p class="text-gray-600">Knowledge base entries that improve document review accuracy</p>
             </div>
             <a href="/feedback"
-               class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+               class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-accent hover:bg-accent-700">
                 + Add Learning
             </a>
         </div>
@@ -20,7 +20,7 @@
         <form action="/learnings" method="GET" class="mb-6">
             <div class="flex gap-2">
                 <input type="text" name="query" value="{{ query or '' }}"
-                       class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                       class="flex-1 rounded-md border-slate shadow-sm focus:border-accent focus:ring-accent sm:text-sm"
                        placeholder="Search learnings...">
                 <button type="submit"
                         class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
@@ -45,7 +45,7 @@
         {% if learnings %}
         <div class="space-y-4">
             {% for learning in learnings %}
-            <div class="border rounded-lg p-4 hover:bg-gray-50" x-data="{ expanded: false }">
+            <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50" x-data="{ expanded: false }">
                 <div class="flex justify-between items-start">
                     <div class="flex-1">
                         <div class="flex items-center gap-2 mb-1">
@@ -66,7 +66,7 @@
                             {{ learning.content }}
                         </p>
                         <button @click="expanded = !expanded"
-                                class="text-xs text-blue-600 hover:text-blue-800 mt-1"
+                                class="text-xs text-accent hover:text-accent-700 mt-1"
                                 x-text="expanded ? 'Show less' : 'Show more'"
                                 x-show="'{{ learning.content }}'.length > 150">
                         </button>
@@ -90,9 +90,9 @@
             <p class="text-lg">No learnings found</p>
             <p class="text-sm mt-1">
                 {% if query %}
-                Try a different search term or <a href="/learnings" class="text-blue-600">view all</a>
+                Try a different search term or <a href="/learnings" class="text-accent hover:text-accent-700">view all</a>
                 {% else %}
-                <a href="/feedback" class="text-blue-600">Add your first learning</a> to improve the system
+                <a href="/feedback" class="text-accent hover:text-accent-700">Add your first learning</a> to improve the system
                 {% endif %}
             </p>
         </div>
