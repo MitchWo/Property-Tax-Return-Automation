@@ -140,6 +140,7 @@ class TransactionProcessor:
                 transaction.gst_inclusive = category_result.gst_inclusive if hasattr(category_result, 'gst_inclusive') else False
                 transaction.deductible_percentage = category_result.deductible_percentage if hasattr(category_result, 'deductible_percentage') else 100.0
                 transaction.categorization_source = category_result.categorization_source if hasattr(category_result, 'categorization_source') else 'unknown'
+                transaction.categorization_trace = category_result.categorization_trace if hasattr(category_result, 'categorization_trace') else None
                 transaction.confidence = category_result.confidence if hasattr(category_result, 'confidence') else 0.0
                 transaction.needs_review = category_result.needs_review if hasattr(category_result, 'needs_review') else True
                 # Truncate review_reason as safety fallback (even though DB now supports TEXT)
@@ -365,6 +366,7 @@ class TransactionProcessor:
                 transaction.gst_inclusive = category_result.gst_inclusive if hasattr(category_result, 'gst_inclusive') else False
                 transaction.deductible_percentage = category_result.deductible_percentage if hasattr(category_result, 'deductible_percentage') else 100.0
                 transaction.categorization_source = category_result.categorization_source if hasattr(category_result, 'categorization_source') else 'unknown'
+                transaction.categorization_trace = category_result.categorization_trace if hasattr(category_result, 'categorization_trace') else None
                 transaction.confidence = category_result.confidence if hasattr(category_result, 'confidence') else 0.0
                 transaction.needs_review = category_result.needs_review if hasattr(category_result, 'needs_review') else True
                 # Truncate review_reason as safety fallback
@@ -500,6 +502,7 @@ class TransactionProcessor:
         tax_return_id: UUID
     ) -> List[TransactionSummaryResponse]:
         """Generate or update transaction summaries per category."""
+        logger.info(f"Starting summary generation for tax_return_id: {tax_return_id}")
         try:
             # Get all transactions for tax return
             result = await db.execute(
@@ -567,12 +570,14 @@ class TransactionProcessor:
             summaries = result.scalars().all()
 
             await db.commit()
+            logger.info(f"Successfully created {len(summaries)} summaries for tax_return_id: {tax_return_id}")
 
             # Return response objects using custom method to include relationship data
             return [TransactionSummaryResponse.from_orm_with_mapping(s) for s in summaries]
 
         except Exception as e:
-            logger.error(f"Error generating summary: {e}")
+            logger.error(f"Error generating summary: {e}", exc_info=True)
+            await db.rollback()
             return []
 
     async def _get_processing_result(

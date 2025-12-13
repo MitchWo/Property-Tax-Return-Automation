@@ -349,7 +349,13 @@ class WorkbookGenerator:
         ]
 
         # Adjust months based on tax year
-        if "25" in tax_return.tax_year:
+        if "24" in tax_return.tax_year:
+            months = [
+                ("Apr-23", 34), ("May-23", 35), ("Jun-23", 36), ("Jul-23", 37),
+                ("Aug-23", 38), ("Sep-23", 39), ("Oct-23", 40), ("Nov-23", 41),
+                ("Dec-23", 42), ("Jan-24", 43), ("Feb-24", 44), ("Mar-24", 45)
+            ]
+        elif "25" in tax_return.tax_year:
             months = [
                 ("Apr-24", 34), ("May-24", 35), ("Jun-24", 36), ("Jul-24", 37),
                 ("Aug-24", 38), ("Sep-24", 39), ("Oct-24", 40), ("Nov-24", 41),

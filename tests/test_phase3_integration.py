@@ -145,7 +145,6 @@ class TestDatabaseModels:
             description="LOAN INTEREST CHARGED",
             amount=Decimal("-523.45"),
             category_code="interest",
-            transaction_type="expense",
             is_deductible=True,
             deductible_percentage=Decimal("80.00"),
             confidence=Decimal("0.95"),
@@ -165,7 +164,6 @@ class TestDatabaseModels:
         summary = TransactionSummary(
             tax_return_id=sample_tax_return.id,
             category_code="interest",
-            transaction_type="expense",
             transaction_count=24,
             gross_amount=Decimal("12500.00"),
             deductible_amount=Decimal("10000.00"),

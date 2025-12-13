@@ -6,12 +6,14 @@ A production-ready system that automatically classifies documents, extracts and 
 
 ## 🚀 Current Build Status
 
-- **Version**: 3.1.0 (Phase 1, 2 & 3 Complete with Lighthouse Financial Template)
-- **Status**: Production Ready with Enhanced Workbook Generation
+- **Version**: 3.2.0 (Enhanced with Categorization Tracing & Analytics)
+- **Status**: Production Ready with Full Audit Trail
 - **AI Model**: Claude Opus 4.5 (claude-opus-4-5-20251101)
 - **Transaction Processing**: Universal bank statement support via Claude AI
+- **Categorization**: Multi-layer with complete decision tracing
 - **Workbook Template**: Lighthouse Financial compliant format
-- **Last Updated**: December 2024
+- **Analytics**: Comprehensive categorization audit dashboard
+- **Last Updated**: December 13, 2024
 
 ## 📋 Table of Contents
 
@@ -25,6 +27,37 @@ A production-ready system that automatically classifies documents, extracts and 
 - [Development Journey](#development-journey)
 - [Phase Roadmap](#phase-roadmap)
 - [Contributing](#contributing)
+
+## 🔄 Recent Updates (December 13, 2024)
+
+### Latest Enhancements
+
+1. **Transaction Categorization Trace System**
+   - Complete audit trail for every categorization decision
+   - Tracks which layer (YAML/Learned/AI) made the decision
+   - Provides reasoning and confidence scores
+   - Accessible via `/api/transactions/{id}/trace` endpoint
+   - File: `categorization_trace.py` - New tracing module
+
+2. **Categorization Audit Dashboard**
+   - Visual analytics for categorization performance
+   - Source breakdown showing pattern effectiveness
+   - Confidence score distribution analysis
+   - Expandable transaction details per category
+   - Accessible at `/categorization-audit/{tax_return_id}`
+   - Files: `categorization_analytics.py`, `categorization_audit.html`
+
+3. **Summary Generation Fixes**
+   - Fixed TransactionSummary field validation errors
+   - Resolved Decimal to JSON serialization issues
+   - Fixed SQLAlchemy case statement syntax errors
+   - Summaries now generate correctly with monthly breakdowns
+
+4. **Workbook Interest Population Fix**
+   - Added FY24 date range support (Apr-23 to Mar-24)
+   - Fixed monthly interest data not populating in cells K34-K45
+   - Interest expense now correctly shows with full monthly breakdown
+   - Total interest of $29,070.33 now properly flows through formulas
 
 ## 🔄 Recent Updates (December 2024)
 
@@ -105,12 +138,38 @@ A production-ready system that automatically classifies documents, extracts and 
 
 ## 🏗️ Architecture
 
+### System Overview
+
+The Property Tax Agent uses a modern microservices-inspired architecture with clear separation of concerns:
+
+```mermaid
+graph TD
+    A[Web UI] --> B[FastAPI Routes]
+    B --> C[Service Layer]
+    C --> D[Database Layer]
+    C --> E[AI Services]
+
+    C --> F[Document Processor]
+    C --> G[Transaction Processor]
+    C --> H[Categorizer]
+    C --> I[Workbook Generator]
+
+    E --> J[Claude AI Vision]
+    E --> K[Claude AI Text]
+
+    D --> L[PostgreSQL]
+    D --> M[Transaction Cache]
+```
+
+### Directory Structure
+
 ```
 property-tax-agent/
 ├── app/
 │   ├── api/                          # FastAPI routes and endpoints
 │   │   ├── routes.py                 # Main API and web routes
-│   │   └── transaction_routes.py     # Transaction processing endpoints (with enhanced logging)
+│   │   ├── transaction_routes.py     # Transaction processing endpoints
+│   │   └── categorization_analytics.py # NEW: Analytics and audit endpoints
 │   ├── models/                       # Database models
 │   │   └── db_models.py              # SQLAlchemy ORM models
 │   ├── schemas/                      # Pydantic validation schemas
@@ -126,10 +185,11 @@ property-tax-agent/
 │   │   │   ├── embeddings.py         # Embedding generation
 │   │   │   └── knowledge_store.py    # Pinecone integration
 │   │   ├── transaction_processor.py  # Main transaction orchestrator (async fix)
-│   │   ├── transaction_extractor_claude.py  # NEW: Universal AI extractor
-│   │   ├── transaction_categorizer.py # Multi-layer categorization
+│   │   ├── transaction_extractor_claude.py  # Universal AI extractor
+│   │   ├── transaction_categorizer.py # Multi-layer categorization engine
+│   │   ├── categorization_trace.py   # NEW: Categorization decision tracing
 │   │   ├── tax_rules_service.py      # Tax compliance rules
-│   │   └── workbook_generator.py     # NEW: Lighthouse Financial template
+│   │   └── workbook_generator.py     # Lighthouse Financial template generator
 │   ├── rules/                        # Configuration files
 │   │   ├── categorization.yaml       # Transaction patterns
 │   │   └── bank_parsers.yaml         # Bank-specific formats (legacy)
@@ -263,6 +323,68 @@ The system automatically detects critical issues that block tax return completio
 4. **Date Issues**: Documents outside the tax year
 5. **Settlement Timing**: New build settlement outside tax year
 
+## 🔍 Categorization Trace System
+
+### Overview
+
+Every transaction includes a complete trace of how it was categorized, providing full transparency and debugging capabilities.
+
+### Trace Structure
+
+```json
+{
+  "transaction_id": "uuid",
+  "description": "LOAN INTEREST CHARGED",
+  "amount": -523.45,
+  "layers": {
+    "yaml_pattern": {
+      "checked": true,
+      "matched": true,
+      "pattern": "interest|loan.*charged",
+      "category": "interest",
+      "confidence": 0.95
+    },
+    "learned_pattern": {
+      "checked": false
+    },
+    "claude": {
+      "checked": false
+    }
+  },
+  "final_decision": {
+    "category": "interest",
+    "confidence": 0.95,
+    "source": "yaml_pattern",
+    "needs_review": false
+  }
+}
+```
+
+### Accessing Traces
+
+1. **Via API**: `GET /api/transactions/{transaction_id}/trace`
+2. **Via UI**: Click "View Trace" on any transaction
+3. **Audit Report**: Comprehensive view at `/categorization-audit/{tax_return_id}`
+
+### Categorization Layers
+
+1. **YAML Pattern Matching (95% confidence)**
+   - Predefined regex patterns in `categorization.yaml`
+   - Fastest and most reliable for known patterns
+
+2. **Learned Pattern Matching (80-90% confidence)**
+   - Exact matches from historical corrections
+   - Fuzzy matching for similar transactions
+
+3. **AI Extraction (85% confidence)**
+   - Document-level categorization from initial AI extraction
+   - Useful for bank-specific transactions
+
+4. **Claude AI Fallback (60-90% confidence)**
+   - Individual transaction analysis
+   - Provides reasoning for decisions
+   - Handles novel or complex transactions
+
 ## 🔄 Transaction Processing Workflow (Enhanced)
 
 ### How It Works
@@ -373,6 +495,38 @@ Fields:
 ```http
 POST /api/transactions/process/{tax_return_id}
 Response: ProcessingResult with transaction counts and status
+```
+
+#### Get Transaction Categorization Trace
+```http
+GET /api/transactions/{transaction_id}/trace
+Response: {
+  transaction_id, description, amount,
+  layers: { yaml_pattern, learned_pattern, claude },
+  final_decision: { category, confidence, source }
+}
+```
+
+#### Get Categorization Analytics
+```http
+GET /api/categorization/{tax_return_id}/analytics
+Response: {
+  source_breakdown, category_breakdown,
+  confidence_distribution, review_breakdown,
+  pattern_effectiveness, review_samples
+}
+```
+
+#### Get Audit Report
+```http
+GET /api/categorization/{tax_return_id}/audit-report
+Response: Comprehensive categorization audit with insights
+```
+
+#### Get Problem Transactions
+```http
+GET /api/categorization/{tax_return_id}/problem-transactions?limit=50
+Response: List of transactions needing review with issues identified
 ```
 
 #### Generate Workbook
@@ -516,12 +670,15 @@ docker-compose down -v
 
 ## 🏆 Recent Achievements
 
+- ✅ Complete categorization trace system for full transparency
+- ✅ Categorization audit dashboard with analytics
+- ✅ Fixed interest expense workbook population ($29,070.33 now correct)
 - ✅ Universal bank statement support via Claude AI
 - ✅ Professional Lighthouse Financial workbook template
-- ✅ Increased API token limits for large datasets
-- ✅ Fixed all critical async/database bugs
-- ✅ Cleaned project structure
-- ✅ Force regeneration for testing
+- ✅ Fixed TransactionSummary generation issues
+- ✅ Resolved Decimal to JSON serialization errors
+- ✅ Added FY24 date range support for workbooks
+- ✅ Expandable transaction details in audit UI
 - ✅ Comprehensive error handling and logging
 
 ## 📚 Key Dependencies
@@ -568,5 +725,5 @@ This project is proprietary software. All rights reserved.
 
 **Built with ❤️ for the NZ property investment community**
 
-*Last updated: December 2024*
-*Version: 3.1.0 - Universal AI Extraction & Lighthouse Financial Template*
+*Last updated: December 13, 2024*
+*Version: 3.2.0 - Enhanced with Categorization Tracing, Analytics & Workbook Fixes*

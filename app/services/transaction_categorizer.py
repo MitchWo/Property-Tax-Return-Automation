@@ -24,6 +24,7 @@ from app.schemas.transactions import (
     TransactionCreate,
     TransactionUpdate,
 )
+from app.services.categorization_trace import CategorizationTrace
 from app.services.phase1_document_intake.claude_client import ClaudeClient
 from app.services.skill_loader import get_skill_loader
 
@@ -76,6 +77,9 @@ class TransactionCategorizer:
         # Determine transaction type from amount
         txn_type = "income" if transaction.amount > 0 else "expense"
 
+        # Initialize trace
+        trace = CategorizationTrace()
+
         # Initialize result
         result = TransactionCreate(
             tax_return_id=tax_return.id,
@@ -106,39 +110,68 @@ class TransactionCategorizer:
             txn_type
         )
 
-        if yaml_match and yaml_match["confidence"] >= self.AUTO_ACCEPT_THRESHOLD:
-            result.category_code = yaml_match["category"]
-            result.confidence = yaml_match["confidence"]
-            result.categorization_source = yaml_match["source"]
-            result.needs_review = yaml_match.get("flag_for_review", False)
-            result.review_reason = yaml_match.get("review_reason")
-            return await self._apply_tax_rules(db, result, tax_return)
+        if yaml_match:
+            trace.record_yaml_match(
+                True,
+                yaml_match["category"],
+                yaml_match["confidence"],
+                yaml_match.get("pattern_name", "unknown")
+            )
+            if yaml_match["confidence"] >= self.AUTO_ACCEPT_THRESHOLD:
+                result.category_code = yaml_match["category"]
+                result.confidence = yaml_match["confidence"]
+                result.categorization_source = yaml_match["source"]
+                result.needs_review = yaml_match.get("flag_for_review", False)
+                result.review_reason = yaml_match.get("review_reason")
+                result.categorization_trace = trace.to_dict()
+                return await self._apply_tax_rules(db, result, tax_return)
+        else:
+            trace.record_yaml_match(False)
 
         # Layer 3: Learned Patterns (Exact Match)
         exact_match = await self._match_learned_exact(
             db, transaction.description, transaction.other_party
         )
 
-        if exact_match and exact_match["confidence"] >= self.AUTO_ACCEPT_THRESHOLD:
-            result.category_code = exact_match["category"]
-            result.confidence = exact_match["confidence"]
-            result.categorization_source = "learned_exact"
-            result.needs_review = False
-            return await self._apply_tax_rules(db, result, tax_return)
+        if exact_match:
+            trace.record_learned_match(
+                True,
+                exact_match["category"],
+                exact_match["confidence"],
+                exact_match.get("times_applied", 0)
+            )
+            if exact_match["confidence"] >= self.AUTO_ACCEPT_THRESHOLD:
+                result.category_code = exact_match["category"]
+                result.confidence = exact_match["confidence"]
+                result.categorization_source = "learned_exact"
+                result.needs_review = False
+                result.categorization_trace = trace.to_dict()
+                return await self._apply_tax_rules(db, result, tax_return)
 
         # Layer 4: Learned Patterns (Fuzzy Match via pg_trgm)
         fuzzy_match = await self._match_learned_fuzzy(
             db, transaction.description
         )
 
-        if fuzzy_match and fuzzy_match["confidence"] >= self.AUTO_ACCEPT_THRESHOLD:
-            result.category_code = fuzzy_match["category"]
-            result.confidence = fuzzy_match["confidence"] * 0.95  # Slight penalty for fuzzy
-            result.categorization_source = "learned_fuzzy"
-            result.needs_review = result.confidence < self.AUTO_ACCEPT_THRESHOLD
-            if result.needs_review:
-                result.review_reason = f"Fuzzy match to: {fuzzy_match.get('matched_description', '')}"
-            return await self._apply_tax_rules(db, result, tax_return)
+        if fuzzy_match:
+            trace.record_learned_match(
+                True,
+                fuzzy_match["category"],
+                fuzzy_match["confidence"],
+                fuzzy_match.get("times_applied", 0)
+            )
+            if fuzzy_match["confidence"] >= self.AUTO_ACCEPT_THRESHOLD:
+                result.category_code = fuzzy_match["category"]
+                result.confidence = fuzzy_match["confidence"] * 0.95  # Slight penalty for fuzzy
+                result.categorization_source = "learned_fuzzy"
+                result.needs_review = result.confidence < self.AUTO_ACCEPT_THRESHOLD
+                if result.needs_review:
+                    result.review_reason = f"Fuzzy match to: {fuzzy_match.get('matched_description', '')}"
+                result.categorization_trace = trace.to_dict()
+                return await self._apply_tax_rules(db, result, tax_return)
+        elif not exact_match:
+            # Only record no learned match if neither exact nor fuzzy matched
+            trace.record_learned_match(False)
 
         # At this point, use best available match or fall back to Claude/unknown
         best_match = self._get_best_match(yaml_match, exact_match, fuzzy_match)
@@ -149,6 +182,7 @@ class TransactionCategorizer:
             result.categorization_source = best_match.get("source", "combined")
             result.needs_review = True
             result.review_reason = best_match.get("review_reason", "Confidence below auto-accept threshold")
+            result.categorization_trace = trace.to_dict()
             return await self._apply_tax_rules(db, result, tax_return)
 
         # Layer 5: Claude AI (for uncertain items)
@@ -158,11 +192,17 @@ class TransactionCategorizer:
             )
 
             if claude_result:
+                trace.record_claude_result(
+                    claude_result["category"],
+                    claude_result["confidence"],
+                    claude_result.get("reasoning", "")
+                )
                 result.category_code = claude_result["category"]
                 result.confidence = claude_result["confidence"]
                 result.categorization_source = "claude"
                 result.needs_review = claude_result.get("needs_review", True)
                 result.review_reason = claude_result.get("review_reason")
+                result.categorization_trace = trace.to_dict()
                 return await self._apply_tax_rules(db, result, tax_return)
 
         # Layer 6: Flag for human review
@@ -172,6 +212,7 @@ class TransactionCategorizer:
         result.needs_review = True
         result.review_reason = "Could not categorize - requires manual review"
         result.transaction_type = txn_type
+        result.categorization_trace = trace.to_dict()
 
         return result
 
@@ -231,9 +272,9 @@ class TransactionCategorizer:
 
             # Apply Claude results back to the main results list
             for (txn, idx), claude_result in zip(uncertain, all_claude_results):
-                if claude_result:
-                    results[idx].category_code = claude_result["category"]
-                    results[idx].confidence = claude_result["confidence"]
+                if claude_result and isinstance(claude_result, dict):
+                    results[idx].category_code = claude_result.get("category", "unknown")
+                    results[idx].confidence = claude_result.get("confidence", 0.0)
                     results[idx].categorization_source = "claude"
                     results[idx].needs_review = claude_result.get("needs_review", True)
                     results[idx].review_reason = claude_result.get("review_reason")
@@ -546,11 +587,18 @@ IMPORTANT:
 
         # Apply interest deductibility rules
         if transaction.category_code == "interest" and transaction.is_deductible:
+            # Handle property_type as either enum or string
+            property_type_value = (
+                tax_return.property_type.value
+                if hasattr(tax_return.property_type, 'value')
+                else tax_return.property_type
+            )
+
             rule_result = await db.execute(
                 select(TaxRule).where(
                     TaxRule.rule_type == "interest_deductibility",
                     TaxRule.tax_year == tax_return.tax_year,
-                    TaxRule.property_type == tax_return.property_type.value
+                    TaxRule.property_type == property_type_value
                 )
             )
             rule = rule_result.scalar_one_or_none()
@@ -739,7 +787,6 @@ IMPORTANT:
         query = text("""
             SELECT
                 category_code,
-                transaction_type,
                 COUNT(*) as transaction_count,
                 SUM(amount) as gross_amount,
                 SUM(COALESCE(deductible_amount, 0)) as deductible_amount,
@@ -747,7 +794,7 @@ IMPORTANT:
             FROM transactions
             WHERE tax_return_id = :tax_return_id
             AND category_code IS NOT NULL
-            GROUP BY category_code, transaction_type
+            GROUP BY category_code
         """)
 
         result = await db.execute(query, {"tax_return_id": tax_return_id})
@@ -766,7 +813,6 @@ IMPORTANT:
             summary = TransactionSummary(
                 tax_return_id=tax_return_id,
                 category_code=row.category_code,
-                transaction_type=row.transaction_type,
                 transaction_count=row.transaction_count,
                 gross_amount=row.gross_amount or Decimal("0"),
                 deductible_amount=row.deductible_amount or Decimal("0"),
@@ -785,7 +831,7 @@ IMPORTANT:
         db: AsyncSession,
         tax_return_id: UUID,
         category_code: str
-    ) -> Dict[str, Decimal]:
+    ) -> Dict[str, float]:
         """Get monthly breakdown for a category (used for interest workings)."""
         query = text("""
             SELECT
@@ -804,7 +850,7 @@ IMPORTANT:
             {"tax_return_id": tax_return_id, "category_code": category_code}
         )
 
-        return {row.month: row.total for row in result.fetchall()}
+        return {row.month: float(row.total) for row in result.fetchall()}
 
 
 # Singleton instance

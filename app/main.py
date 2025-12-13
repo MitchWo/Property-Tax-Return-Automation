@@ -54,11 +54,14 @@ app.add_middleware(
 
 # Include routers
 from app.api.transaction_routes import transaction_router, transaction_web_router
+from app.api.categorization_analytics import router as categorization_router, web_router as categorization_web_router
 
 app.include_router(api_router)
 app.include_router(web_router)
 app.include_router(transaction_router)
 app.include_router(transaction_web_router)
+app.include_router(categorization_router)
+app.include_router(categorization_web_router)
 
 # Mount static files if needed
 # app.mount("/static", StaticFiles(directory="app/static"), name="static")

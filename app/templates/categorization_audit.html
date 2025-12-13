@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Categorization Audit Report - {{ property_address }}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+        }
+        h3 {
+            color: #666;
+            margin-top: 20px;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        .summary-card h4 {
+            margin: 0 0 10px 0;
+            color: #555;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .summary-card .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+        }
+        .summary-card .subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .source-breakdown {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+        .source-item {
+            flex: 1;
+            min-width: 200px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .source-item .source-name {
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        .source-item .count {
+            font-size: 24px;
+            color: #007bff;
+            margin-bottom: 5px;
+        }
+        .source-item .confidence {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* Enhanced Category Table with Expandable Rows */
+        .category-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .category-table th {
+            background: #007bff;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .category-table td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .category-row {
+            background: #fff;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .category-row:hover {
+            background: #f0f8ff;
+        }
+        .category-row.expanded {
+            background: #e8f4ff;
+            font-weight: 600;
+        }
+        .expand-icon {
+            display: inline-block;
+            width: 20px;
+            transition: transform 0.3s;
+            color: #007bff;
+            font-size: 18px;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        .expand-icon.expanded {
+            transform: rotate(90deg);
+        }
+        .category-name {
+            font-weight: bold;
+            color: #333;
+        }
+        .pl-row {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .amount {
+            font-family: monospace;
+            text-align: right;
+        }
+        .positive {
+            color: #28a745;
+        }
+        .negative {
+            color: #dc3545;
+        }
+
+        /* Transaction Details Section */
+        .transaction-details {
+            display: none;
+            background: #f8f9fa;
+            border-left: 3px solid #007bff;
+            margin-top: 0;
+        }
+        .transaction-details.show {
+            display: table-row;
+        }
+        .transaction-details-content {
+            padding: 20px;
+        }
+        .transaction-grid {
+            display: grid;
+            gap: 15px;
+        }
+        .transaction-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            gap: 15px;
+            align-items: center;
+            transition: box-shadow 0.2s;
+        }
+        .transaction-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .transaction-date {
+            font-weight: 600;
+            color: #666;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        .transaction-info {
+            flex: 1;
+        }
+        .transaction-description {
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        .transaction-party {
+            color: #666;
+            font-size: 13px;
+            font-style: italic;
+        }
+        .transaction-metadata {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        .metadata-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .metadata-badge.source {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        .metadata-badge.confidence-high {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .metadata-badge.confidence-medium {
+            background: #fff8e1;
+            color: #f57c00;
+        }
+        .metadata-badge.confidence-low {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .metadata-badge.review {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .metadata-badge.reviewed {
+            background: #d4edda;
+            color: #155724;
+        }
+        .transaction-amount {
+            font-family: monospace;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: right;
+            white-space: nowrap;
+        }
+        .transaction-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .btn-small {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            background: white;
+        }
+        .btn-small.btn-view {
+            border-color: #007bff;
+            color: #007bff;
+        }
+        .btn-small.btn-view:hover {
+            background: #007bff;
+            color: white;
+        }
+
+        /* Loading and Empty States */
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .source-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin: 2px;
+            background: #e9ecef;
+            color: #495057;
+        }
+        .source-badge.extraction {
+            background: #d4edda;
+            color: #155724;
+        }
+        .source-badge.claude {
+            background: #cce5ff;
+            color: #004085;
+        }
+        .source-badge.yaml {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .source-badge.learned {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .insight {
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .insight.info {
+            background: #cce5ff;
+            border-color: #004085;
+            color: #004085;
+        }
+        .insight.warning {
+            background: #fff3cd;
+            border-color: #856404;
+            color: #856404;
+        }
+        .insight.error {
+            background: #f8d7da;
+            border-color: #721c24;
+            color: #721c24;
+        }
+        .problem-transaction {
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #fff3cd;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+        }
+        .problem-transaction .date {
+            font-weight: bold;
+            color: #666;
+        }
+        .problem-transaction .description {
+            margin: 5px 0;
+            color: #333;
+        }
+        .problem-transaction .issues {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #856404;
+        }
+        .confidence-bar {
+            display: inline-block;
+            width: 60px;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #dc3545, #ffc107, #28a745);
+            transition: width 0.3s;
+        }
+        .actions {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #dee2e6;
+            text-align: center;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        /* Summary Stats in Dropdown */
+        .category-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f0f8ff;
+            border-radius: 6px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        @media print {
+            .actions {
+                display: none;
+            }
+            .btn-small {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Categorization Audit Report</h1>
+        <p><strong>Property:</strong> {{ property_address }}</p>
+        <p><strong>Tax Year:</strong> {{ tax_year }}</p>
+        <p><strong>Generated:</strong> <span id="generated-time"></span></p>
+
+        <h2>Summary Statistics</h2>
+        <div class="summary-grid">
+            <div class="summary-card">
+                <h4>Total Transactions</h4>
+                <div class="value" id="total-transactions">Loading...</div>
+            </div>
+            <div class="summary-card">
+                <h4>AI Categorized</h4>
+                <div class="value" id="ai-categorized">Loading...</div>
+                <div class="subtitle" id="ai-percentage"></div>
+            </div>
+            <div class="summary-card">
+                <h4>Pattern Matched</h4>
+                <div class="value" id="pattern-matched">Loading...</div>
+                <div class="subtitle" id="pattern-percentage"></div>
+            </div>
+            <div class="summary-card">
+                <h4>Needs Review</h4>
+                <div class="value" id="needs-review">Loading...</div>
+                <div class="subtitle">Manual review required</div>
+            </div>
+        </div>
+
+        <h2>Categorization Source Breakdown</h2>
+        <div class="source-breakdown" id="source-breakdown">
+            <!-- Populated by JavaScript -->
+        </div>
+
+        <h2>Insights & Recommendations</h2>
+        <div id="insights">
+            <!-- Populated by JavaScript -->
+        </div>
+
+        <h2>Category Breakdown with Transaction Details</h2>
+        <p style="color: #666; font-size: 14px;">Click on any category row to expand and see all transactions in that category.</p>
+        <table class="category-table" id="category-table">
+            <thead>
+                <tr>
+                    <th style="width: 30px;"></th>
+                    <th>Category</th>
+                    <th style="text-align: center;">P&L Row</th>
+                    <th style="text-align: center;">Count</th>
+                    <th style="text-align: right;">Total Amount</th>
+                    <th>Categorization Methods</th>
+                </tr>
+            </thead>
+            <tbody id="category-tbody">
+                <!-- Populated by JavaScript -->
+            </tbody>
+        </table>
+
+        <h2>Transactions Needing Review</h2>
+        <div id="problem-transactions">
+            <!-- Populated by JavaScript -->
+        </div>
+
+        <div class="actions">
+            <a href="/transactions/{{ tax_return_id }}" class="btn btn-primary">View All Transactions</a>
+            <a href="#" onclick="window.print()" class="btn btn-secondary">Print Report</a>
+            <a href="/api/categorization/{{ tax_return_id }}/audit-report" class="btn btn-secondary">Download JSON</a>
+        </div>
+    </div>
+
+    <script>
+        const taxReturnId = "{{ tax_return_id }}";
+        let auditData = null;
+        let categoryTransactions = {};
+
+        async function loadAuditReport() {
+            try {
+                const response = await fetch(`/api/categorization/${taxReturnId}/audit-report`);
+                auditData = await response.json();
+
+                // Update generated time
+                document.getElementById('generated-time').textContent =
+                    new Date(auditData.generated_at).toLocaleString();
+
+                // Update summary statistics
+                const summary = auditData.summary;
+                document.getElementById('total-transactions').textContent =
+                    summary.total_transactions.toLocaleString();
+
+                const aiCount = summary.pattern_effectiveness.claude_categorized +
+                               summary.pattern_effectiveness.extraction_categorized;
+                document.getElementById('ai-categorized').textContent = aiCount.toLocaleString();
+                document.getElementById('ai-percentage').textContent =
+                    `${(aiCount / summary.total_transactions * 100).toFixed(1)}% of total`;
+
+                const patternCount = summary.pattern_effectiveness.yaml_patterns +
+                                   summary.pattern_effectiveness.learned_patterns;
+                document.getElementById('pattern-matched').textContent = patternCount.toLocaleString();
+                document.getElementById('pattern-percentage').textContent =
+                    `${(patternCount / summary.total_transactions * 100).toFixed(1)}% of total`;
+
+                document.getElementById('needs-review').textContent =
+                    summary.review_required.toLocaleString();
+
+                // Source breakdown
+                const sourceBreakdown = document.getElementById('source-breakdown');
+                sourceBreakdown.innerHTML = '';
+                for (const [source, data] of Object.entries(summary.categorization_sources)) {
+                    const item = document.createElement('div');
+                    item.className = 'source-item';
+                    item.innerHTML = `
+                        <div class="source-name">${formatSource(source)}</div>
+                        <div class="count">${data.count}</div>
+                        <div class="confidence">Avg confidence: ${(data.avg_confidence * 100).toFixed(0)}%</div>
+                    `;
+                    sourceBreakdown.appendChild(item);
+                }
+
+                // Insights
+                const insightsDiv = document.getElementById('insights');
+                insightsDiv.innerHTML = '';
+                auditData.insights.forEach(insight => {
+                    const div = document.createElement('div');
+                    div.className = `insight ${insight.type}`;
+                    div.textContent = insight.message;
+                    insightsDiv.appendChild(div);
+                });
+
+                // Category breakdown table with expandable rows
+                const tbody = document.getElementById('category-tbody');
+                tbody.innerHTML = '';
+                auditData.category_details.forEach((category, index) => {
+                    // Main category row
+                    const row = document.createElement('tr');
+                    row.className = 'category-row';
+                    row.dataset.categoryCode = category.category_code;
+                    row.dataset.index = index;
+
+                    const methodsHtml = category.categorization_methods
+                        .map(m => `<span class="source-badge ${getSourceClass(m.source)}">${formatSource(m.source)}: ${m.count} (${m.percentage.toFixed(0)}%)</span>`)
+                        .join(' ');
+
+                    row.innerHTML = `
+                        <td>
+                            <span class="expand-icon">▶</span>
+                        </td>
+                        <td>
+                            <span class="category-name">${category.display_name}</span>
+                            ${category.pl_row ? `<span class="pl-row">Row ${category.pl_row}</span>` : ''}
+                        </td>
+                        <td style="text-align: center;">${category.pl_row || '-'}</td>
+                        <td style="text-align: center;">${category.total_count}</td>
+                        <td class="amount ${category.total_amount >= 0 ? 'positive' : 'negative'}">
+                            $${Math.abs(category.total_amount).toFixed(2)}
+                        </td>
+                        <td>${methodsHtml}</td>
+                    `;
+
+                    // Add click handler
+                    row.onclick = () => toggleCategoryDetails(category.category_code, index);
+                    tbody.appendChild(row);
+
+                    // Details row (hidden by default)
+                    const detailsRow = document.createElement('tr');
+                    detailsRow.className = 'transaction-details';
+                    detailsRow.id = `details-${index}`;
+                    detailsRow.innerHTML = `
+                        <td colspan="6">
+                            <div class="transaction-details-content">
+                                <div class="loading" id="loading-${index}">
+                                    <span class="spinner"></span>Loading transactions...
+                                </div>
+                                <div id="transactions-${index}" style="display: none;">
+                                    <!-- Transactions will be loaded here -->
+                                </div>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(detailsRow);
+                });
+
+                // Problem transactions
+                loadProblemTransactions();
+
+            } catch (error) {
+                console.error('Failed to load audit report:', error);
+                alert('Failed to load audit report. Please try again.');
+            }
+        }
+
+        async function toggleCategoryDetails(categoryCode, index) {
+            const row = document.querySelector(`tr[data-index="${index}"]`);
+            const detailsRow = document.getElementById(`details-${index}`);
+            const expandIcon = row.querySelector('.expand-icon');
+            const transactionsDiv = document.getElementById(`transactions-${index}`);
+            const loadingDiv = document.getElementById(`loading-${index}`);
+
+            if (detailsRow.classList.contains('show')) {
+                // Hide details
+                detailsRow.classList.remove('show');
+                row.classList.remove('expanded');
+                expandIcon.classList.remove('expanded');
+            } else {
+                // Show details
+                detailsRow.classList.add('show');
+                row.classList.add('expanded');
+                expandIcon.classList.add('expanded');
+
+                // Load transactions if not already loaded
+                if (!categoryTransactions[categoryCode]) {
+                    loadingDiv.style.display = 'block';
+                    transactionsDiv.style.display = 'none';
+
+                    try {
+                        const response = await fetch(`/api/categorization/${taxReturnId}/category-transactions/${categoryCode}`);
+                        const transactions = await response.json();
+                        categoryTransactions[categoryCode] = transactions;
+
+                        // Render transactions
+                        renderCategoryTransactions(transactions, index);
+
+                        loadingDiv.style.display = 'none';
+                        transactionsDiv.style.display = 'block';
+                    } catch (error) {
+                        console.error('Failed to load transactions:', error);
+                        loadingDiv.innerHTML = 'Failed to load transactions';
+                    }
+                } else {
+                    // Transactions already loaded
+                    transactionsDiv.style.display = 'block';
+                    loadingDiv.style.display = 'none';
+                }
+            }
+        }
+
+        function renderCategoryTransactions(transactions, index) {
+            const container = document.getElementById(`transactions-${index}`);
+
+            if (transactions.length === 0) {
+                container.innerHTML = '<p style="color: #666;">No transactions in this category.</p>';
+                return;
+            }
+
+            // Calculate stats
+            const avgConfidence = transactions.reduce((sum, t) => sum + (t.confidence || 0), 0) / transactions.length;
+            const needsReviewCount = transactions.filter(t => t.needs_review).length;
+            const sourceCounts = {};
+            transactions.forEach(t => {
+                sourceCounts[t.categorization_source || 'none'] = (sourceCounts[t.categorization_source || 'none'] || 0) + 1;
+            });
+
+            let html = `
+                <div class="category-stats">
+                    <div class="stat-item">
+                        <div class="stat-label">Transactions</div>
+                        <div class="stat-value">${transactions.length}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Avg Confidence</div>
+                        <div class="stat-value">${(avgConfidence * 100).toFixed(0)}%</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Needs Review</div>
+                        <div class="stat-value">${needsReviewCount}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Main Source</div>
+                        <div class="stat-value">${formatSource(Object.keys(sourceCounts).reduce((a, b) => sourceCounts[a] > sourceCounts[b] ? a : b))}</div>
+                    </div>
+                </div>
+                <div class="transaction-grid">
+            `;
+
+            transactions.forEach(trans => {
+                const confidenceClass = trans.confidence >= 0.8 ? 'confidence-high' :
+                                       trans.confidence >= 0.5 ? 'confidence-medium' : 'confidence-low';
+
+                html += `
+                    <div class="transaction-card">
+                        <div class="transaction-date">
+                            ${new Date(trans.date).toLocaleDateString()}
+                        </div>
+                        <div class="transaction-info">
+                            <div class="transaction-description">${trans.description}</div>
+                            ${trans.other_party ? `<div class="transaction-party">${trans.other_party}</div>` : ''}
+                            <div class="transaction-metadata">
+                                <span class="metadata-badge source">${formatSource(trans.categorization_source)}</span>
+                                <span class="metadata-badge ${confidenceClass}">
+                                    ${trans.confidence ? (trans.confidence * 100).toFixed(0) + '%' : 'N/A'}
+                                    <span class="confidence-bar">
+                                        <span class="confidence-fill" style="width: ${trans.confidence ? trans.confidence * 100 : 0}%"></span>
+                                    </span>
+                                </span>
+                                ${trans.needs_review ?
+                                    `<span class="metadata-badge review" title="${trans.review_reason || 'Review required'}">Review</span>` :
+                                    ''}
+                                ${trans.manually_reviewed ?
+                                    `<span class="metadata-badge reviewed">Reviewed</span>` :
+                                    ''}
+                                ${trans.is_deductible ?
+                                    `<span class="metadata-badge" style="background: #e8f5e9; color: #2e7d32;">${trans.deductible_percentage}% Deductible</span>` :
+                                    ''}
+                            </div>
+                        </div>
+                        <div class="transaction-amount ${trans.amount >= 0 ? 'positive' : 'negative'}">
+                            ${trans.amount >= 0 ? '+' : ''}$${Math.abs(trans.amount).toFixed(2)}
+                        </div>
+                        <div class="transaction-actions">
+                            <button class="btn-small btn-view" onclick="showTransactionDetails('${trans.id}')">Details</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        async function loadProblemTransactions() {
+            try {
+                const response = await fetch(`/api/categorization/${taxReturnId}/problem-transactions`);
+                const problems = await response.json();
+
+                const problemDiv = document.getElementById('problem-transactions');
+                if (problems && problems.length > 0) {
+                    problemDiv.innerHTML = '';
+                    problems.forEach(trans => {
+                        const div = document.createElement('div');
+                        div.className = 'problem-transaction';
+                        div.innerHTML = `
+                            <div class="date">${new Date(trans.date).toLocaleDateString()}</div>
+                            <div class="description">${trans.description}</div>
+                            <div class="amount ${trans.amount >= 0 ? 'positive' : 'negative'}">
+                                $${Math.abs(trans.amount).toFixed(2)}
+                            </div>
+                            <div class="issues">
+                                ${trans.issues.join('<br>')}
+                                ${trans.confidence !== null ? `
+                                    <div class="confidence-bar">
+                                        <div class="confidence-fill" style="width: ${trans.confidence * 100}%"></div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                        problemDiv.appendChild(div);
+                    });
+                } else {
+                    problemDiv.innerHTML = '<p>No transactions requiring review.</p>';
+                }
+            } catch (error) {
+                console.error('Failed to load problem transactions:', error);
+            }
+        }
+
+        function showTransactionDetails(transactionId) {
+            // Find the transaction in our cached data
+            let transaction = null;
+            for (const [category, transactions] of Object.entries(categoryTransactions)) {
+                const found = transactions.find(t => t.id === transactionId);
+                if (found) {
+                    transaction = found;
+                    break;
+                }
+            }
+
+            if (transaction) {
+                // Show detailed modal or navigate to transaction page
+                const details = JSON.stringify(transaction, null, 2);
+                alert(`Transaction Details:\n\n${details}`);
+            }
+        }
+
+        function formatSource(source) {
+            const sourceMap = {
+                'extraction': 'AI Extraction',
+                'claude': 'Claude AI',
+                'yaml_pattern': 'YAML Pattern',
+                'yaml_payee': 'YAML Payee',
+                'learned_exact': 'Learned Pattern',
+                'learned_fuzzy': 'Fuzzy Match',
+                'manual': 'Manual',
+                'none': 'None'
+            };
+            return sourceMap[source] || source;
+        }
+
+        function getSourceClass(source) {
+            if (source.includes('yaml')) return 'yaml';
+            if (source.includes('learned')) return 'learned';
+            if (source === 'claude') return 'claude';
+            if (source === 'extraction') return 'extraction';
+            return '';
+        }
+
+        // Load report on page load
+        loadAuditReport();
+    </script>
+</body>
+</html>

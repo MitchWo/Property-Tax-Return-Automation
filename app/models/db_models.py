@@ -191,6 +191,7 @@ class Transaction(Base):
     # Confidence and review
     confidence = Column(Float, default=0.0)
     categorization_source = Column(String(50), nullable=True)  # 'yaml_pattern', 'learned_exact', 'learned_fuzzy', 'claude', 'manual'
+    categorization_trace = Column(JSONB, nullable=True)  # Stores diagnostic trace from categorization process
     needs_review = Column(Boolean, default=False)
     review_reason = Column(Text, nullable=True)  # Changed from String(255) to Text to handle longer Claude responses
     manually_reviewed = Column(Boolean, default=False)

@@ -95,6 +95,7 @@ class TransactionCreate(TransactionBase):
     gst_amount: Optional[Decimal] = None
     confidence: float = 0.0
     categorization_source: Optional[str] = None
+    categorization_trace: Optional[Dict[str, Any]] = None
     needs_review: bool = False
     review_reason: Optional[str] = None
     raw_data: Optional[Dict[str, Any]] = None
@@ -137,6 +138,7 @@ class TransactionResponse(TransactionBase):
     # Review status
     confidence: float = 0.0
     categorization_source: Optional[str] = None
+    categorization_trace: Optional[Dict[str, Any]] = None
     needs_review: bool = False
     review_reason: Optional[str] = None
     manually_reviewed: bool = False
