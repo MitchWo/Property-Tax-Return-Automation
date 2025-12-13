@@ -1,0 +1,531 @@
+Here is the transcription of the audio recording involving the Senior Accountant and colleagues.
+
+**Speakers:**
+*   **Speaker 1 (Senior Accountant):** The main narrator performing the work.
+*   **Speaker 2 & 3 (Colleagues):** Male voices asking questions and discussing logistics/AI.
+
+***
+
+**Speaker 1:** Cool. And, yeah. Cool. So, first job we're doing is, uh, Lucy Neame. Um, so I’m pretty sure she’s got two jointly owned properties. Uh, sorry, two *personally* owned properties. So we start by renaming the file to the client file... to the client's name and to the year. Open up the workbook.
+
+**Speaker 2:** Yep.
+
+**Speaker 1:** And so first, I'll have a quick look at what happened in ’24. Um, so her 2024 IR3 is here. So she is an employee in New Zealand, has some interest income, and a small amount of residential property profit. Um, so I can see she owns Kokako Lane and Riro Street in Queenstown and Auckland. Um, both properties were owned before the interest deductibility rules came into effect. So last year they had 50% interest deductibility, and this year they'll have 80%.
+
+**Speaker 1:** Um, so first thing I'm going to do is put her name into the workbook. Resident for tax purposes? Yes. Business commencement date... um, because it's been operating for a couple of years, I'm just going to get rid of this ‘cause it's not required. And then chuck in the names of the properties. So this one is Kokako Lane.
+
+**Speaker 2:** Uh, could you just do one property at a time?
+
+**Speaker 1:** Okay. Yep.
+
+**Speaker 2:** Just simulate...
+
+**Speaker 1:** Yep. So this one is individually owned. So we leave this as 100%. Um, so then I'm just gonna have a quick look at Kokako Lane so I just get an idea of what she had. So like 37,000 of income, 2,300 of rates, just under three grand of insurance, just under 45,000 of interest in total, a small amount of repairs... um, she's got a Body Corporate levy. Um, and a couple of assets that are depreciating. So they're going to automatically pull into the WorkflowMax IR3R with the closing balance as the opening balance, and so that's going to automatically depreciate the chattels that she has, and we'd add in any new ones for ’25.
+
+**Speaker 1:** Um, so then we'll jump into the 2025 info, which is a little bit messy in terms of what we have. So I just need to go through and have a quick squiz at what she's provided us. Um, and see if I can separate them out based on each property. So we've got mortgage statements for Kokako, Jack's Point, Rates, Bayleys management statements. Cool. So...
+
+**Speaker 2:** Go.
+
+**Speaker 3:** All good.
+
+**Speaker 1:** Just start by separating out some of the information into the different properties. Um, so I start a folder called Kokako.
+
+**Speaker 2:** Is that best for AI?
+
+**Speaker 1:** And start by putting anything to do with Kokako into this one.
+
+*(Pause/Clicking sounds)*
+
+**Speaker 1:** So I can see in this one that there's some, um, Otago rates, so that's going to be related to this property. Um, so just referring back to 2024, I'm just going to see which loan is related to Kokako and which is for the Auckland property. So I can see here that Kokako has Westpac Loan 91 and 92, and then Riro Street, which is Auckland, has ANZ Loan 1003. So going back to 2025, um, these statements here are the Westpac ones, they say WP. So I'm just going to move all of these into my Kokako folder.
+
+*(Clicking sounds)*
+
+**Speaker 1:** And then I'll just separate... I'll create that Riro one as well just so that we can get those separated out for the next property.
+
+**Speaker 2:** No, the information doesn't usually get sorted into folders?
+
+**Speaker 1:** No. I'm partly doing this because we're doing it property by property.
+
+**Speaker 2:** Yeah. Yeah.
+
+**Speaker 1:** Yeah. Alright. Let's see if this one opens.
+
+**Speaker 2:** Yep. Just scan...
+
+**Speaker 1:** What's interesting is I realized how much they count for... like the preview feature? Like, previewing stuff as opposed to like, opening things? Yeah.
+
+**Speaker 2:** Yeah.
+
+**Speaker 1:** Okay, so this invoice doesn't really want to open for some reason.
+
+**Speaker 2:** Oh, that one...
+
+**Speaker 1:** Yeah, this one just didn't want to for a little bit, but it's happened now. So this one's Riro. That's Jack's Point, so Jack's Point is in Queenstown. And then these look like ANZ, so they're going to be Riro.
+
+**Speaker 1:** So let's start with Kokako. Um, first thing I'm going to look at is the Property Manager statement because it's the easiest thing to go off. So this Property Manager has a really easy system to use where they create a summary document, um, that has all the information we need and we don't need to break it down by months. So, put the rental income in. 31,420. Um, we have inspection fees and management fees, so both of these get coded as, um, Agent Fees. So I'll just add those two together. So 345 plus 334.38. And then, um, down here I can see that there's a couple of repairs. So I'll just detail them out here. So Electrical... General...
+
+*(Typing sounds)*
+
+**Speaker 1:** And, uh, the references come from down here. They haven't been updated in a while and could be updated, um, if it's going to work with the system better.
+
+**Speaker 2:** That should actually be totally fine. It sort of auto-populates it, so...
+
+**Speaker 1:** So I will start by putting a summary in here. Um, it may change if there are more repairs that have been paid directly by the client in the bank statements, but we don't know yet. So I'll just start with this point. Um, so I've summed up these ones here and then I'll use the Excel workbook just to reference down that they've come from here. My first check that I do is that my income matches my income on here, and that my expenses total also matches. Um, so I have 4361.79 here which matches nicely to the statement. If I didn't... if I'd already put something in through here, what I would do is just highlight the two cells to check that the sum at the bottom was also referring back the same.
+
+**Speaker 1:** Um, on a different example, if we had a different property manager statement where it wasn't as neat, I would do this...
+
+*(Typing)*
+
+**Speaker 2:** Ah, so the property manager statement "Workings" section... that section, it's not a requirement?
+
+**Speaker 1:** No.
+
+**Speaker 2:** Ah, okay, gotcha. I think I called it "connection."
+
+**Speaker 1:** I... I think it is good for different property managers. So this is where it gets a little bit iffy. Um, so the property manager we're dealing with, Bayleys, this is a really good statement and we have no other information. Sometimes when you get the ones that have the monthly breakdowns, they don't always add up as they should. Um, so it can be a good idea to list them all out and add it up. Um... but to be honest, if you get an end-of-year summary, you can go off the end-of-year summary.
+
+**Speaker 2:** Yeah. But if not, and... and then the statements are usually provided, the monthly statements are usually provided in different PDFs anyway, right?
+
+**Speaker 1:** Yeah. Yeah.
+
+**Speaker 2:** Yeah, statements to fill out, so...
+
+**Speaker 1:** So this would be a different way of adding up and checking that it, um, looks as you expect it to. Um, cool. So then next thing to do is look at the operating bank statements. Um, so this is just a baseline of what you kind of *might* have in a bank statement and it can be fiddled with from there. Unfortunately, these... okay, so these statements firstly don't look super in order. I can see that they start at Statement 67, but the client has labeled it as Statement 62. So I'm just going to take a second to see... um, if the information is all there and it's just been saved down weirdly, or if it's not.
+
+**Speaker 1:** So working backwards I can see we have Jan, December... So you're looking for March? I'm just... I'm looking at the different months that we have. So I haven't yet seen anything from April ’24. Um, I did see that the client provided *some* information during the ’24 year which is saved in a slightly different file. Okay, so this is a good sign, we're getting back to June... May to June... April to May. Okay. This was just an anomaly, the first one was just a little bit odd.
+
+**Speaker 1:** Um, so this statement starts the 12th of April. So ideally I do want to go have a look for a different, um, a different statement that will start a month earlier. I'm a little bit confused about what this "850 from Kyle Malia" is. So I am just going to jump back to 2024 and see, uh, one, if that's in the workings. Um... which it's not. And so then I will just have a look at the bank statements and see if I can see that in the 2024 statements.
+
+*(Pause)*
+
+**Speaker 1:** Okay. So someone called Malia... Kyle Malia. And then we have a "Stevens AB" for 1700. So, go back to the workings again. It's potential that that's related to Riro. Um, so let's just open up 2024. That's come from a property manager statement, and then this has come from working somewhere. I *think* those payments from that name are going to be related to the *other* property. So we will overlook those at the moment and begin by looking at the...
+
+**Speaker 2:** Experiences?
+
+**Speaker 1:** *(Laughs)* Begin by looking at...
+
+**Speaker 3:** That's with someone...
+
+**Speaker 1:** Yeah.
+
+**Speaker 3:** Yeah, to get the sentence, that's what I did.
+
+**Speaker 2:** Yeah. This is someone like...
+
+**Speaker 1:** So I found the... the statement that I need was provided last year, so I'm just going to move it into this file and delete the one that we don't have.
+
+**Speaker 2:** Like these things, like... trying to...
+
+**Speaker 1:** Mmm.
+
+**Speaker 2:** Yeah.
+
+**Speaker 1:** So in the way that I would usually do it, if I was going through this bank statement I *would* be putting in the rental income from the other one. Do you want me to do that or do you want me to overlook that at the moment?
+
+**Speaker 2:** So, I would just... I could just label it the name to the side. And add a "look into" later.
+
+**Speaker 1:** Yeah. Can you do that please? Because that's what I want the system to do. Still fill it out, but go "look into" or "this looks weird" or something, you know?
+
+**Speaker 2:** Yeah.
+
+**Speaker 1:** So with this one, because we know that it's rented to a property manager and I can see that there's funds coming in from Kyle Malia but I'm not too sure what those are, I'm just going to detail them here with the name. So Kyle Malia, and just add a "look into." Um, typically with these things we would put a highlight so that you can't forget it.
+
+**Speaker 1:** Um, so starting here at the 8th of April, I can see there's equals 850. This looks like it's going to be a regular amount, so I'm just going to put equals 850 so I can go back and multiply as required. Um, and then I can see I've got Watercare as one of the first things. Uh, Watercare is a little bit interesting. I'm not too sure if it's going to relate to the Queenstown property. Typically Watercare is an *Auckland* based service. Um, so that's a little bit of a flag for me that it might not be related to *this* property.
+
+**Speaker 1:** Um, again in this bank statement I can see another three payments for 850 in April. Uh, we've got a transfer out, I'm not bothered about that one. And so then I can see I've got Loan Account 91 and Loan Account 92 interest.
+
+**Speaker 3:** It's cool, that small little thing, identifying, "Yeah, you don't pay Watercare in Queenstown."
+
+**Speaker 2:** Yeah.
+
+**Speaker 3:** Yeah, you're right.
+
+**Speaker 1:** I've said that, but I actually don't know, I'm going to have to check. *(Laughs)*
+
+**Speaker 3:** You're lying?
+
+**Speaker 1:** Yeah, I am. Yeah, you're right.
+
+**Speaker 1:** Um, so I've got my loan interest payments. I can see for 91 and 92 here, which, um, based on last year were for Kokako. So I'll just add that in above. So 172.48.
+
+**Speaker 2:** Is water wrapped up in your council rates? I guess?
+
+**Speaker 3:** I think so. Pretty sure my parents invoice covers everything.
+
+**Speaker 2:** True.
+
+**Speaker 1:** Yeah, I think...
+
+**Speaker 1:** Okay so I can also see we've got some Auckland Council rates. Again, not too sure if that's related to this Queenstown property, but we'll add it into here as we go through, uh, the statements. So unfortunately with this client, they haven't provided a CSV. So if this was in a CSV, um, typically what we would do is get the CSV and filter it by the expense type and just copy in the totals. Um, so this is a lengthy version of this job.
+
+**Speaker 2:** Yeah.
+
+**Speaker 1:** Yeah. My worst nightmare. Haven't done one of these in so long.
+
+**Speaker 1:** Um, so back to checking these anomaly payments. So I'm getting that there is a pattern of 850 per week from this, um, Kyle payment. Um, so it's looking like it's a rent payment unrelated to the account. So we'll just keep noting it down and making sure that we pick those up so that we can look into them later.
+
+**Speaker 3:** And I assume the process is you try and identify what it is, and if you can't, you just go back to the client, right?
+
+**Speaker 1:** 100%. Yeah.
+
+**Speaker 3:** And it can just click "Okay" on that, being like, "OCR couldn't read it."
+
+**Speaker 1:** Yeah. So one thing I've noticed here is we've gone from Statement 66 to Statement 68. So I think I've actually made a mistake before, in that I deleted a statement. Um, so I'm just going to check... Oh, did I delete it? I did. So the client had labeled that one incorrectly, and we actually do need it. Um, so I'll pop that back in.
+
+**Speaker 1:** Um, usually I wouldn't delete things a client had mislabeled, but I thought we already had the statement, so that one's on me. Um...
+
+*(Working through statements)*
+
+**Speaker 1:** So when we start noticing patterns, um, with the payments of things like Rates or, um, rental income, it's checking how many payments there are, but you *can* just start copying and pasting the summary from the one before.
+
+**Speaker 2:** Um, as much as possible?
+
+**Speaker 1:** ‘Cause obviously it saves just a little bit of time. But it also requires checking.
+
+**Speaker 2:** Yeah, noticing when it's a five-week month vs...
+
+**Speaker 1:** Yeah. Yeah, and so like, um, it becomes quite obvious when you've got 30-day months that they get charged 3626, and when it's 31-day months they get charged 3747.
+
+**Speaker 1:** Um, so we're in October. So we've got two... and we've got four again.
+
+**Speaker 2:** So do you need your PC?
+
+**Speaker 3:** Ah, nah. Just good reading up stuff. Did the AB testing on logos.
+
+**Speaker 2:** Nice. Is it looking good?
+
+**Speaker 3:** Yeah.
+
+**Speaker 2:** Sick.
+
+**Speaker 3:** I want to buy a TV.
+
+**Speaker 2:** Yeah. That's super loud.
+
+**Speaker 1:** I just plug my entire workstation into the spare room.
+
+**Speaker 2:** Yeah. Why? I think I'll just bring mine.
+
+**Speaker 3:** Are you staying at Ravi's for the next week?
+
+**Speaker 2:** No we doing the spare room.
+
+**Speaker 3:** Oh yeah. Alicia was like, "So... like, what does this Mitch have, any dietary requirements?"
+
+**Speaker 1:** *(Laughs)*
+
+**Speaker 3:** And Brooke here, she bought like... she bought like a whole stack of Coke Zeros for you.
+
+**Speaker 2:** Oh!
+
+**Speaker 3:** Some coffee for me. Red Bulls. And like snacks and stuff.
+
+**Speaker 2:** So this was three years ago... two years ago? Three years ago when I went? That's like, yup. Just ten times worse.
+
+**Speaker 1:** So just one thing I've noticed is that in November, um, we've got a first month where we don't have an Interest 91 charge. So what I'm just going to quickly check is what happens in the loan statements that we have down here. Um, so looking at the loan statements, I can see that these two interest charges in September/October match up to what I have written from the operating account. But then if I get to November/December, it's charged at zero. So it looks like this client has an Offset Account. Which isn't an issue, it's just, um, checking that we haven't missed something for *why* why the interest has randomly stopped.
+
+**Speaker 1:** Um, so I'll go back to filling out the rest of the form. Which... 850. Cool. Get them there. Um, and then I can see that interest rates have gone up significantly in December. Um, so there's a big payment out, but I can see she's labeled it "Japan," so appears to be unrelated to her rentals. That has skipped over again, so we've got Statement 71 three times. Okay.
+
+**Speaker 3:** How organized are clients with stuff like that? Like I can imagine there's a lot of people that just transfer their money and they don't reference it.
+
+**Speaker 1:** Oh, all the time. So that's fine. You see an account with nothing, um, referenced? You ignore it. Until... unless it's flagged with something that it's for a specific... you wouldn't bother looking into it. Because people take... like, to most clients, this is them earning money and they're just taking their drawings.
+
+**Speaker 3:** Yeah right.
+
+**Speaker 2:** Bank accounts looking a bit healthy...
+
+**Speaker 1:** *(Laughs)* Once a week. Yeah, I think I deserve it.
+
+**Speaker 1:** So big thing with these ones is watching when there are duplicate, um, duplicates of the statements. Because it's very easy to just keep going, typing in what you see each time. So noticing that, um, that the statement looks the same is really important because otherwise you're just going to end up double claiming expenses, double claiming income. Not good for anyone.
+
+*(Typing)*
+
+**Speaker 1:** Cool. And then... Okay, and we're back to having interest on Loan 91 again. So I will go back to those statements at the end and just double check that they are as expected. Uh, more transfers for Japan... two, three...
+
+**Speaker 2:** Yeah.
+
+**Speaker 3:** Yeah.
+
+**Speaker 1:** What's that?
+
+**Speaker 3:** Possibly... employee accounts or...
+
+**Speaker 1:** So, yes. Yeah. Um... Cool. So that's those statements done. So I'm just going to have a quick look at the Interest Statement here. So this matches up. We've got zero dollar charges in, um, November/December/Jan. We've got 2412 in March. And then the statement ends. Um, but based on what I can see in the other accounts, it makes sense that there is interest charged.
+
+**Speaker 1:** Um, and then so one thing to just have a quick check on as well is that there haven't been any major changes to the loans. So Loan Limit is 29,114. It was 28,956 at the beginning of the year. And it's 28,956 at the end of the year for 91. And at the beginning of the year for the 92 it was 1053, and at the end of the year it's 1053. So that's fine.
+
+**Speaker 2:** Wait so it's interest only?
+
+**Speaker 1:** Yes. Yeah.
+
+**Speaker 1:** So then I have this *other* account called Jack's Point, which is actually an ANZ account. Which, one moment, is now confusing me because last year we had Westpac labeled as Kokako. Okay, so turns out the Operating Account for Kokako might be the ANZ one. But these loans are for... for Kokako.
+
+**Speaker 1:** Um, so because it's a CSV, we will look to do this a little bit faster. Um, typically when I'm changing bank statement, I would change this one to say the Westpac 00 Account. Um, and do a separate section for ANZ. Um, so I would start by copying it and getting rid of all of the details that are related to this one. So that it's a blank slate, but it's got the summary section. ANZ 00 Account. Um, and we'll get rid of this.
+
+**Speaker 1:** So basically I'll start by looking at what the payee options are. If there's... if there were a whole heap, I wouldn't bother with starting with this. I would go off of what I expect. But I can see very quickly that this is an account this client uses specifically for properties. Like there's very minimal normal transactions.
+
+**Speaker 1:** Um, so if I start with Jack's Point, this is a payment of a thousand. So let's just pop this one in here. Um, Jack's Point is typically going to be a Body Corporate payment of some sort. Um, based on last year, but not definitely. So then I've got Otago Regional Council, so we'll go Rates in December. 1022.37.
+
+**Speaker 1:** This is the net income from our property manager. Um, so these... here you can see that, um, this is Bayleys Property Management trading as Bayleys Property Management. It's coming through as the "Accommodation," um, which isn't abnormal. One thing I *will* just quickly check because I do know we have multiple properties, is the sum of everything.
+
+**Speaker 1:** Um, so I ignore the 2nd of April payment because it's very normal for that to be related to the past year. Um, so that's 37,058.21. And that perfectly matches. So I'm happy that those are the net rent income. Um, I'm going to ignore those because of that. If that had come up as 28,000 or 42,000, so a variance of about 10%, then I'd probably want to look into it further. But because it's in theory the same amount, fine, move on.
+
+**Speaker 1:** Um, then we have Loan 1003. So this here is Loan 1003. So I did see this in our last year accounts and I saw that it was related to a different property. So I'm just going to put "Look Into." Um, what I do in this instance is grab these, um, pop them to the side. And then go... And then just get rid of these parts. Um, and I'll chuck our interest deductibility section back in because everything last year was 80%.
+
+**Speaker 1:** Um, go to our next option in here. So then we've got Unarranged Overdraft Fee. Um... So we've got April, July, August, September, Jan and Feb. Check the blanks. So we do have some Debit Interest. Uh, so label that Overdraft Interest. And what we would expect is that if you have an overdraft... if you have a bank fee, you probably have particularly where it's called "Unarranged Overdraft," um, you would expect your interest to fall in the same month. So I know which ones I need to match these up to really easily.
+
+**Speaker 1:** Um, on the other hand what we *can* do with ones like this where we've got the CSV, is just do the sum and put the sum in. But when we've already done a PDF copy of bank statements, it's not that much effort to go and do it so that everything matches on a monthly basis.
+
+**Speaker 1:** Um, and then we'll go back to these ones up here at the top. So these are transfers. So uninterested in these. And then this one here is a payment on a bank card. Um, or an online credit card payment. So those are unrelated as well. So that's that bank statement sorted.
+
+**Speaker 1:** Um, so we've done all the bank statements, we've done this one. Now we've got this Activity Statement. So this here is, um, the Jack's Point Residents and Owners Association, which is the Body Corporate for the area. Um, I can see... so this is 1 April 24 to 31 March 25. It's a summary. This is actually really helpful. Um, so we've got a mix of the invoices and how she's made payments. So these could have come from anywhere. Um, I'm going to come back to this one rather than start with it because we may have invoices further down that are a little bit easier to reference.
+
+**Speaker 1:** Um, so if I go back to here, this is a Rates Invoice. Um, so this is for the property. And what we want to look at is this installment. So we've got a payment required here of 598.58. Um, and she's got an amount to clear for the year of 625.1. So, "As authorized, monthly payments will be direct debited from your bank account to pay your rates." So that's really good to know. So that means that although this installment is 598, she actually does need to pay this full 625 because she doesn't pay it, um, in a quarterly arrangement, she pays it monthly. Um, and from a bank statement that we don't have access to because it's not come up in either of these statements.
+
+**Speaker 1:** Um, so this here is part of... No. These ones all... So we've got one insurance part to do with Kokako. Um, that's got a date of October 2025, which relates to the 2026 tax year. Um, this one appears to be for Riro. And this one's for landlord for 2024. Cool. So this one's 2932.1. Um, so we'll put this one in here with Inv 2932.1.
+
+**Speaker 1:** Uh, we've been through those. And then we've got these Rates. So what I want to have a look at is, again, she has an arrangement where she's paying it by direct debit from bank account. So one thing I *do* want to look at 24 to understand is how we did rates last year.
+
+*(Pause/Clicking)*
+
+**Speaker 1:** Okay. 346. So last year we've done it on the invoice amounts. So we'll follow that this year as well. Um, when we don't have the bank statement... if we had the bank statement, we would use the bank statement payment amounts. But because we have no proof of payment, we want to use the rates amounts from the invoices because we know those as fact. Um, rather than what else she might be paying for as an additional amount for doing it on a monthly basis.
+
+**Speaker 1:** Um, so we'll start with this April one. Which is six... uh, 598.58. Um, and then we go... so, the other thing we do want to think about as well is we have a payment here in December of 1022.37. But if I go back to the bank statement, that was actually for Otago Regional Council from memory, rather than from Queenstown Lakes. So I *will* just change that to Otago Regional Council Rates.
+
+**Speaker 1:** And we'll come back here and pop in the rest of the invoices. So September is 692.29. And I can reasonably expect the next three... well, all three of these to be the same amount. Um, because they're in the same ratings year. So times three. And then we will add in this payment to the Otago Regional Council. And why was the 598 different? 598 was different because it was part of the, um, 2024 to 2025 rates. And then the September onwards was all part of ’25 to ’26. So the rates years run from 1 July to 30 June.
+
+**Speaker 2:** Ah, okay. Cool. Is that across the country or is that...?
+
+**Speaker 1:** It is across the country. Yup.
+
+**Speaker 1:** Um, so we're going to go back to the Activity Statement for Jack's Point. So I've been through all the other documents, um, and there doesn't appear to be anything else related to the Body Corporate other than this. So what we're going to use is the invoice amount. Um, she still has an amount owing at 31 March 25. Um, but we can reasonably expect that she is going to make payment of it. And because we don't have the bank statements that show the payments for this other than one of these many $1,000 payments in March 25, we will ignore this and just use the invoice, um, basis.
+
+**Speaker 1:** So come up to here and change this one to Body Corporate. So we've got 1176.46 plus 1261. And unfortunately there's no sum of these at the bottom so it does require typing them out.
+
+*(Typing)*
+
+**Speaker 1:** Um, if any of these amounts was, you know, if say one of these 1357 numbers was actually like three and a half thousand, we would probably go back to the client and ask for more details. So most, um, most of these payments will be for the general insurance that the Body Corporate covers, um, sum of the maintenance, and then there'll be like small maintenance contributions which is probably like these 289s and like, um, other small bits and bobs. Anything that is a lot *more* than the usual payment we would question because sometimes that can be capital works done to the entire area that the Body Corporate covers.
+
+**Speaker 2:** Which is not...
+
+**Speaker 1:** Which is sometimes deductible, sometimes not.
+
+**Speaker 1:** Um, cool. So we have some of this filled out. Um, and some of this still in the workbook... workings for the bank statements. Um, so I'm just going to add a note here. "Excl. used invoice." And then let's go and add in our bank fees. Um, we're going to apply our interest deductibility rules to the Overdraft Interest. And then we're going to bring in our interest from this one and this one. And the overdraft. And then down here we will add in Capitalized Interest.
+
+*(Typing)*
+
+**Speaker 1:** Not that one, sorry, that's a "Look Into Later."
+
+**Speaker 1:** Um, cool. So that is Kokako done. Do you want me to continue with the next property and show you how we would do it? Or do you want me to clarify anything on this one first?
+
+**Speaker 2:** Probably next one.
+
+**Speaker 1:** Next one? Cool.
+
+**Speaker 2:** Yeah. Ah... yeah, go next one.
+
+**Speaker 1:** Cool. So if I go back to the general folder, I'm just going to do a quick refresh to myself on was there anything else, um, in here that I may have missed. So before I start on the next one. So this one I know that we moved into the other folder. This, I can see has an IRD number so I'm going to ignore it, it will come through from IRD. Um, these provided in FY24 docs are to do with the Rates, so we know that we already have those. And those were the bank statements that I've already used. So that's fine.
+
+**Speaker 1:** Cool. So our next property is Riro. Um, so this was 40A Riro Street, Point Chevalier. I'm just going to update this one to say Queenstown. Um, and then this one to say 40A Riro Street, Auckland. And we are also individually owned.
+
+**Speaker 1:** So, I'm going to start by looking at this bank statement. Um, and this is the one we've already used in the CSV. So that's fine. Uh, we have here our Loan 1003 interest statement. Um, so this is actually a summary which makes the copy-paste I did in this other one a little bit pointless. But on the plus side, we can see that the interest matches, so that's perfect. And so now we know that this is for Riro. And so I can change that from being "Look Into" to Riro.
+
+**Speaker 1:** Um, so that's nice and easy. I've got my Auckland Council transaction history here. Um, and this is a summary of all the payments made to Auckland Council. So this is really helpful. Um, it's showing us that these match against the payments we have from the statements. I can see here there's a 22 April one. Um, which I didn't have. So I'm just going to go back to that bank statement and see if it was in there and I missed it. Um, which may have come in that confusion of the statement naming.
+
+**Speaker 2:** Statement 64?
+
+**Speaker 1:** Mmm. Yeah, might be 64. No. So it's 62 and 63. And so I can see here we've got 10th of April... and then if I go into this part... uh, we've got a transfer, we've got interest, we've got interest, but we've got no rates payment. Um, I can see Statement 67 again...
+
+**Speaker 2:** That was the...
+
+**Speaker 1:** That was the... yeah.
+
+**Speaker 2:** It didn't exist.
+
+**Speaker 1:** That didn't exist.
+
+**Speaker 2:** Yeah.
+
+**Speaker 1:** Yeah. So that's fine. Just what that's saying is that in the bank statement, this particular bank statement, the payment to Auckland Council wasn't there. But the summary from Auckland Council tells us this amount *has* been paid. Um, so I will put that in here. And add these ones.
+
+**Speaker 1:** So I want to keep, um, I want to keep the bank statements *as* the bank statements. And not add other payments in here to the bank statements.
+
+**Speaker 2:** No, but you do...
+
+**Speaker 1:** Inv/BS. So this is now telling me that I've got both bank statement and invoice data in here.
+
+**Speaker 1:** Um, so then if I come to... ah there we go, so this is actually an invoice that was for Kokako. So I'm just going to move that in there. That was that Rates one, um, that we had the payment for here.
+
+**Speaker 1:** Um, back to Riro. So we've got the loan interest already, which is really easy. So let's go and equals this one here. Um, and then we have Rental Property Riro. Okay, and so now she's labeled the Westpac account as being for Riro. So what is flagging for me now is that potentially last year there was an error in how the loan interest got allocated. Because we're following last year with that Westpac is for Kokako and ANZ is for Riro. And she has labeled the bank accounts in the opposite way.
+
+**Speaker 1:** So first thing though, that is good, is we now know what Kyle Malia is for. Is it's rental income for *this* property. So we will change this to Riro. And we can go and include the rental income here.
+
+**Speaker 1:** Um, again we have this bank statement labeled as Riro with all the Watercare services. And this adds up to our understanding that Watercare is an Auckland based business, um, that collects... that does the water for Auckland. Um, so I'm happy to include this for Riro as well.
+
+**Speaker 1:** One thing that is flagging a little bit weirdly for me is that in November 24 there was a payment of 2147. Uh, that is more than ten times most of the other months. It's almost a hundred times the prior months. Which *also* flags weirdly to me, right? So it's unusual for someone to be paying $26 as their water rates, um, for an entire property. So it says to me initially this raises a flag that this is wrong and something maybe capital has occurred. And then on the other hand, now that I'm looking at these $20 payments, um, and a couple of months of no payment and then followed by some months of 300, I'm now wondering if there was an... a whole bunch of months of *underpayment* where they haven't done a meter reading and they've had to do a big tidy up.
+
+**Speaker 1:** So I'm just going to have a quick look at 24 again. Um, and I see since last year we have $275 on water rates. Which is very low. So I am actually happy to accept that, and I'll add a note about it, um, further down. So we'll bring in the water rates here.
+
+**Speaker 1:** Back to this client info for Riro. Um, and so then here we have our insurance. So, Insurance 1 is an insurance cover for Jan 25... invoice in December 24. And this second one is something to do with August 25. Um, so we're going to ignore the second one and include the first one. I'm just going to do a quick check that in 24 we used Invoice Basis as well.
+
+*(Pause)*
+
+**Speaker 1:** Okay. So last year we have payments that have been done on insurance. So I just want to see if I can figure out what they've done.
+
+*(Pause/Working)*
+
+**Speaker 1:** Right.
+
+*(Pause)*
+
+**Speaker 1:** Okay. So I can't easily see which way the insurance was dealt with last year. So I'm going to proceed with using it on Invoice Basis for 25. Um, so 2814.00. Cool.
+
+**Speaker 1:** Um, so let's just go back to our bank statements and see if there's anything that we haven't dealt with. Uh, so we've done these two interest, we've done the rental income, we've done water care, we've got the rates in there with the additional invoice. And these have gone to Kokako.
+
+**Speaker 1:** So a couple of notes I want to add is... Watercare in November 24 was a large payment. Assume catch up payment. And one thing we have here is this invoice as well. Alright, here we go, here's our answer. So it's a repair. So we're just going to add in a new line here. And what I'm going to update this to, um, is which property the expenses are for. So we've got Kokako on this one. So if you only had one property you wouldn't do this. Um, but in the case of having two properties we do want to know what each property is... what each expense is for. So we've got Plumber Invoice 748.13. And Riro.
+
+*(Typing)*
+
+**Speaker 2:** This is a fantastic plumber's invoice. Does this always happen?
+
+**Speaker 1:** No.
+
+**Speaker 2:** No.
+
+**Speaker 1:** Neither Watercare provide a rebate...
+
+**Speaker 2:** *(Laughs)* Being flagged by the system but...
+
+**Speaker 1:** Based on Repairs Invoice. Yeah, wouldn't expect it to, but... So they do. Cool.
+
+**Speaker 1:** So what I'm just going to quickly go back and look at now is this ANZ statement. So these transactions for Watercare and, uh, the repairs were in November/December. So I just want to double check if there was any funds intro amounts that might actually have been a reimbursement. Um... and you got that from the invoice, right? You reckon it said...
+
+**Speaker 2:** Yeah, it recommends a Watercare rebate.
+
+**Speaker 1:** I haven't often seen a Watercare rebate in situations like this so it wouldn't be surprising to me that it never gets recovered. Um, but there's no harm in checking for it. So going back through these bank statements, there is no additional funds provided from Watercare. So that's fine.
+
+**Speaker 1:** That's as expected from this information. The thing that's raising a flag for me is that the client has labeled Westpac as Riro and ANZ as Kokako. And we have labeled it the other way based on what we did in 24. So what I want to just have a look at, um, in making sure that we're doing it as expected, is just what happened last year that made us decide to do it this way.
+
+*(Thinking/Pause)*
+
+**Speaker 2:** Is this like... kind of where using previous years can be a bit dangerous?
+
+**Speaker 1:** Yeah.
+
+**Speaker 2:** Okay. So I can see clearly here that in 2023 the client has labeled Westpac... Riro... but also everything looks like it was with Westpac. So it's a little bit of a funny one. So if I go into these two documents here which are the CoreLogic downloads for the property...
+
+*(Pause/Clicking)*
+
+**Speaker 1:** Sometimes.
+
+**Speaker 2:** Not always. Not often in this...
+
+**Speaker 1:** Yeah, so looking... looking at these, it does look like we have them the wrong way round. Um, the reason being is that this ANZ loan is much less... First... first flag is that, uh, it's a little bit of a flag how negatively geared Queenstown is. And Riro is... Riro is positive, but it also had an amount of repairs and maintenance, right? So it had something outside of the normal with a water burst pipe and it still made a profit. So usually it was... it's not too much of a flag, but this... and looking looking at the loan balances, looking at CoreLogic, I am pretty confident we've got these the wrong way round.
+
+**Speaker 1:** So I am going to change the treatment of the interest in this instance. This is the mess of the process. AI to actual fucking... checking AI. That is the real reason. Yeah.
+
+**Speaker 1:** So ANZ 00 Account, we're going to just update this to say it's Queenstown. And we're going to change this one to say that it's Riro. And this makes everything way cleaner based on what the client says too.
+
+**Speaker 1:** Um, in 2024 Westpac Loan treated as Queenstown. This was round the wrong way. So does that mean that 24 was wrong? It doesn't matter because it's on a portfolio basis. The outcome is the exact same. It looks a little bit different this year because, um, we have more interest available as a deduction.
+
+*(Typing)*
+
+**Speaker 1:** So let's just start this again. Capitalized Interest. So Kokako. Ah, I just completely misspelled that properly. Whatever. Kokako. Yeah, I think I got it confused with another property. What is it? Kokako?
+
+**Speaker 2:** Kokako.
+
+**Speaker 1:** Yeah. And then this one is... So aside from adding in to, um, WorkflowMax which would potentially show us some depreciation adjustments, and then adding in the accounting fees... So because this property is in a loss position and this is a tax resident of New Zealand, we can claim the accounting fees as an income expense. Um, so I will add that out the side here. And that's the workbook done. Before going and adding it to the next system.
+
+**Speaker 2:** Yeah. Question I want answered... should we be using previous years?
+
+**Speaker 1:** Yeah, maybe. I don't know.
+
+**Speaker 2:** I think you have to.
+
+**Speaker 1:** So you ran through it in, let's just say an hour. How long would it take in like just... rub minutes... to do this?
+
+**Speaker 2:** I reckon...
+
+**Speaker 1:** Say not longer. Quite a lot longer.
+
+**Speaker 2:** Quite a lot longer?
+
+**Speaker 1:** Yeah. That was... that was very slow. Like that would take me 15 minutes uninterrupted. Maybe 20 minutes. Um, most people would probably take, like Vinay could probably get through it in about 45 these days. Um, someone newer would probably take an hour and a half to two hours.
+
+**Speaker 2:** Yeah so like, say... could Kiara do this?
+
+**Speaker 1:** She could? I think it would take her two to three hours.
+
+**Speaker 2:** Which is interesting ‘cause like... that's who you're trying to... Yeah. And like the industry's thinking about it with like, "High five! This is a low... this is like a fairly easy job." But I base it on the value of the... of the job. And like whatever notes are in. But the notes here I could imagine is just like, "individually owned two properties" and that's it. Like in my head it's like an easy job, but you look at how complex...
+
+**Speaker 1:** It is. And it is an easy job. This was... like to me this was really easy. Yeah. Like someone could do this on a Friday afternoon and we could bill it. Kind of thing. Um, this... even though there was a couple of little nuances, this is still a very easy one. The information was really neat in this. This is a good client to give to this situation. That's part of where I think there are the things for checking that we want the system to tell us to check. More than we want the system to necessarily have to work it out.
+
+**Speaker 2:** Um, the use of previous years... that was higher than usual, I reckon. Like me going back to prior year? That was higher than usual.
+
+**Speaker 1:** Like you could add a step... you could try and get it to figure out everything from client info. And then if it...
+
+**Speaker 2:** Yeah, you want it to... then go to prior year?
+
+**Speaker 1:** I don't think we want it going to prior year. I think we want that put back into the review process.
+
+**Speaker 2:** Okay.
+
+**Speaker 1:** ‘Cause the idea with what we're building right now isn't that we're going and making a whole team redundant, right?
+
+**Speaker 2:** No. Not yet anyway.
+
+**Speaker 1:** Exactly. So, so first variation is that our team still has an element of work to be required to do. So I wonder if instead of... so partly I want the part where it says what it has or hasn't done. But along with that maybe it goes, "For rates I've used invoices. Part of the next step for the accountant is to check how last year was treated."
+
+**Speaker 2:** Yeah. Oh yeah. Or the first review.
+
+**Speaker 1:** Yeah, the first review. And, you know, if the first review it's like, "I'm gonna use this document for this, this for this, this for this, do you agree?"
+
+**Speaker 2:** I'm gonna use like this document the client provided for this thing.
+
+**Speaker 1:** So basically it does a document sort.
+
+**Speaker 2:** Yeah it does... yeah it does a document sort against the expectations.
+
+**Speaker 1:** Yeah. Because if we're going... you're always going to have rental income. You're always going to have rates. You're always going to have insurance or Body Corporate or both. You're always going to have... you're almost always going to have interest, repairs. You may have bank fees, you may have this, you may have that. And it goes, "For the Always, this is my source doc." And then like, "I've found these examples of this thing."
+
+**Speaker 2:** I think the way we'll build that out is... "check bank statements to draw rental income." "Use loan statements to calculate interest." Okay, yeah I think I know what you mean. "I'm going to use this invoice for repairs and maintenance." Yeah, right, okay. I think... yeah, yeah I know what you mean. Yup. Yup. We can build that. That's just part of the logic.
+
+**Speaker 1:** Because that would be... yeah that would be almost the first review point I think. Is like, you're confirming its base understanding. And then going, "Yup, go do that."
+
+**Speaker 2:** I think as a V1, you have human checkpoints.
+
+**Speaker 1:** Checkpoints. Yeah.
+
+**Speaker 2:** And then once you're getting consistent... On the plus side, we've got another bill to send this week.
+
+**Speaker 1:** Yeah boy.
+
+*(Discussion about a calendar invite)*
+
+**Speaker 3:** Hey, sorry, who has the Financial Reporting calendar invite?
+
+**Speaker 2:** Is it not you?
+
+**Speaker 3:** No it's not me.
+
+**Speaker 2:** Oh must be you.
+
+**Speaker 1:** It's you.
+
+**Speaker 3:** Can you just move it please?
+
+**Speaker 2:** Oh yeah. 9:30 Thursday?
+
+**Speaker 3:** 9:30 Thursday. Yeah. Easy. Thanks.
+
+**Speaker 1:** Should I stop?
+
+**Speaker 2:** Uh, yeah stop. Nothing else to discuss hey?
+
+**Speaker 1:** No. Yeah.
+
+**Speaker 2:** I'll find another one to try doing the same way today that's a little more... you want a LTC or a Trust ideally, eh? How do I... hit my zoom back?
+
+**Speaker 3:** You can just go "Stop" here.
+
+**Speaker 2:** And... yeah... you can just end it from there. If you go "End for All."
