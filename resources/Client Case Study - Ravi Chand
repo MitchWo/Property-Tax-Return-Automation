@@ -1,0 +1,264 @@
+Here is a transcription of the video featuring an accountant (Ravi) walking a colleague (Mitch) through the process of completing a tax return for a rental property using a specific workbook template.
+
+**00:00 - 00:30**
+**Mitch:** Can you hear my mouse and keyboard?
+**Ravi:** Yeah.
+**Mitch:** Bro, where do you live? That looks f\*\*\*ing mean.
+**Ravi:** Yeah, it's a f\*\*\*ing mean look.
+**Mitch:** Bro, where is that?
+**Ravi:** Ah, Glen Eden, I live up the hill.
+**Mitch:** Oh nice. Bro, that's real nice.
+**Ravi:** Yeah, it's crazy man. We all should come here for drinks someday.
+**Mitch:** Keen. Summer. Burn eager. Looks nice as.
+**Ravi:** Yeah.
+
+**00:30 - 01:00**
+**Mitch:** Um, Mitch is here as well. So we're trying to like... we're trying to like automate the return process.
+**Ravi:** Yeah.
+**Mitch:** So, give me a sec. [Mitch logs into computer] Right, so... So I want you to walk me through exactly how you would go about doing my returns as if they haven't been done.
+**Ravi:** Yeah.
+
+**01:00 - 02:00**
+**Mitch:** So I've provided you a bunch of information, which I would go through. So let me just find my name... Right, so I've provided you a CSV of transactions on the running account. And this looks like... oh yup, the loan account.
+**Ravi:** Yeah.
+**Mitch:** And then I've provided you a triple C... Settlement statement letter.
+**Ravi:** Mh-hm.
+**Mitch:** This looks like the second page of the settlement statement. A client statement?
+**Ravi:** Yeah, that's the second page of settlement I guess.
+**Mitch:** Okay, cool. And then looks like some email information.
+
+**02:00 - 03:00**
+**Mitch:** So basically what you're doing when you do a return is you're taking the information from these CSVs...
+**Ravi:** From the CSVs, yeah.
+**Mitch:** And you're inputting it into this workbook. Where is the templated workbook?
+**Ravi:** Ah, if you go to Lighthouse -> Operations. Because I have got it on my desktop side. Yeah. If you go Lighthouse... Operations.
+**Mitch:** Operations.
+**Ravi:** Ah was it Internal Documents? Procedures and Documents?
+**Mitch:** Internal Documents?
+**Ravi:** Yeah, and then Year End. Is it?
+**Mitch:** Oh yup.
+**Ravi:** No, why is it not coming up on it? Do the same for PTR? Because I have got all the workbooks saved on my desktop so I don't really go...
+
+**03:00 - 04:00**
+**Mitch:** Yeah, all good. So... Tax workpapers?
+**Ravi:** No, no. So go to PTR folder. And then same, yeah Internal Procedures and then Year End. And that's all workbooks.
+**Mitch:** Okay.
+**Ravi:** So there will be a Rental Working as well, yeah.
+**Mitch:** Ah yep. [Mitch copies the file to his desktop]
+
+**04:00 - 05:00**
+**Mitch:** And so while that's downloading... so what you're trying to achieve is just taking all this information...
+**Ravi:** Yeah.
+**Mitch:** And you're manually inputting it into the workbook, right?
+**Ravi:** Yeah, so basically I would just copy the whole CSV from there. Because I won't edit the one client has sent to us, so I would just keep that as it is. But I would just copy the whole thing and paste it on the Rental Working as a new tab and just put them as like "Rental Property Current Account" or "CSV."
+**Mitch:** Yep. [Mitch creates new tab in Excel]
+**Ravi:** I don't know why it's not f\*\*\*ing downloading.
+
+**05:00 - 06:00**
+**Ravi:** Yeah, so I would just go... add a tab. Copy the whole thing. And just paste it there. And rename it as a Current Account, like everyday account or just CSV, whatever is easy.
+**Mitch:** Yep.
+**Ravi:** And then I would just go filter that out.
+**Mitch:** Uh, like filter the...
+**Ravi:** The whole thing, yeah. So if you click from A to E. And then go Data -> Filters. Yeah. And then I'll go to the... sort ascending.
+**Mitch:** Ascending. Right, yeah, gotcha.
+
+**06:00 - 07:00**
+**Ravi:** So that's basically all what you have got. So all of that are rental income, $700. So I would just like... just rename it next to it. So I would create a new tab saying "Reconciliation" and I would just code them. Just click on F. Go up and rename as "Reconciliation." And then I would start coding them next to it, like what is the transaction related to? So all of that I assume are loan payments... 01... so I would just go like "Loan Payments." And all of them are rental incomes from 31st August to... keep going... 28th March. All of them are rental incomes.
+**Mitch:** Like I'm doing now?
+**Ravi:** Yeah, that's perfect.
+
+**07:00 - 08:00**
+**Ravi:** So that's how you have got all the rental income. So that's a Bond Received. So with the rental properties, you can put that as an income or you can just leave it as a note saying "Oh you have received the bond but you haven't included it as rental income because you're gonna eventually pay it back."
+**Mitch:** Yeah, yeah. Cool.
+**Ravi:** All of them would be Funds Introduced. That's all the payments you have made to this account to pay your mortgage.
+**Mitch:** Yes. F\*\*\*, I top up this property a lot.
+**Ravi:** Funds Introduced, yeah.
+
+**08:00 - 09:00**
+**Ravi:** So all of them would be that... yep perfect. And that would be Bank Contribution, which is considered as an income as well. And the next one would be Bank Fees. And all of them are rental income again, I guess. Yeah. Sweet. So that would be Water Bill... Water Rates. But that's recovered right? So that would be "Water Rates Recovered." So that's basically tenants paying you back.
+**Mitch:** Yep.
+
+**09:00 - 10:00**
+**Ravi:** Yep all of them... that would be Rates. Council Rates.
+**Mitch:** Yep.
+**Ravi:** Same, Council Rates.
+**Mitch:** Uh... yeeeaaah.
+**Ravi:** I think you have paid three of them together. And that would be Drawings because you have withdrawn money from here.
+**Mitch:** Yep.
+**Ravi:** And rest looks like Water Rates that you have paid. So that's basically it. And then I will just bring in your loan statement as well the similar way we did it, so it gives an interest expense as well.
+**Mitch:** So you don't have a property manager statement, do you?
+**Ravi:** No.
+**Mitch:** And so what do you do if they have a PDF?
+**Ravi:** Oh then I have to go through each transaction and I would put it down in the workings. But right now I can just sum up the whole rent received and just put the figures. I don't have to break it down each month because we have got the CSV attached. But if there was no CSV, then I have to go through each transaction and put it down in the workings, like break it down each month.
+
+**10:00 - 11:00**
+**Mitch:** Okay, I might get you to show me how to do that.
+**Ravi:** Yeah. [Mitch works in Excel] So all of them are loan payments, but the rest of them are interest. From 3rd of August 23, which is loan interest. So all of them are loan payments and rest of them are interest. So that's basically how much interest have you paid for the last financial year.
+**Mitch:** Yep. And is this Settlement?
+**Ravi:** Yeah settlement. So you can ignore it, don't really need that.
+**Mitch:** Cool. What do I do next?
+**Ravi:** So what I would do is just calculate the interest you have paid. Just sum them up.
+
+**11:00 - 12:00**
+**Ravi:** So I would just put like 29,070.33 as loan interest paid on the Profit and Loss.
+**Mitch:** Yeah. I'll just replace what I have here.
+**Ravi:** No, just keep the same. Don't use the old ones. I think keep the fresh one. That will just help us to do a breakdown as well.
+**Mitch:** Okay cool.
+**Ravi:** So when you go your loan statement again on the CSV we have just pulled in. If they have not provided CSV, if it's a bank statement, you want to go through each month's bank statement and put the figures down there as like interest paid for each month.
+**Mitch:** Right. Do you have an example you can quickly show me of somebody that's...
+**Ravi:** Ah... I can't think anything off top of my head. Lawrence Lotts?
+**Mitch:** Is he PTR or Lighthouse?
+**Ravi:** Lighthouse.
+
+**12:00 - 13:00**
+[Mitch navigates folders looking for files]
+**Mitch:** Are you guys at the office today?
+**Ravi:** Yeah.
+**Mitch:** Ah sh*t. Come on man. F\*\*\* I hate Google Drive sometimes.
+**Ravi:** It's f\*\*\*ing horrible man. It's giving me pain from last week.
+**Mitch:** I think we need to move to using just it on Google Chrome.
+**Ravi:** Yeah.
+**Background voice:** Did you still have issues with it Neville when you updated your laptop?
+**Ravi:** Yeah it's still same man.
+**Mitch:** Is it real slow for you? Cause it's been real slow for me.
+**Ravi:** It's slow plus it doesn't pick up client files from Google Drive.
+
+**13:00 - 14:00**
+**Ravi:** Yep so you know how you have got this Interest Deductibility and Bank Statement workings?
+**Mitch:** Uh yeah give me a sec.
+**Ravi:** So what I would do is... [Mitch opens file] No, this is not the correct one.
+**Mitch:** No. [Mitch searches Drive]
+**Ravi:** But he has provided the End of Year bank statement for ANZ and they just show you the amount they have paid for the entire year so they don't really have a breakdown of each month.
+**Mitch:** Mmm. So do you have to go through and manually calculate it?
+**Ravi:** Yeah so basically if you didn't provide a CSV and if you have given like a PDF, then we have to go through like month of April and interest paid for the month of April. And then each month you have to break it down. But now that we have got CSVs you can just add up the amount and just put it as a total. You don't have to do a breakdown of each month.
+**Mitch:** And the PDF... it's requiring you to input the correct number so like there's a chance for example you get the calculation wrong.
+**Ravi:** Yeah, 100% yeah.
+
+**14:00 - 15:00**
+**Mitch:** Yeah okay cool. So assume take my one for example... I just total it?
+**Ravi:** Yeah just total that. 29,070.33.
+**Mitch:** Yeah where do I put that?
+**Ravi:** Ah just there yeah. So you can just take that off and just put the figures.
+**Mitch:** Cool.
+**Ravi:** That won't be negative, it will be positive.
+**Mitch:** Yeah. Sweet.
+**Ravi:** So that's basically doing the formula. It's deducting 80% and the rest 20% will be capitalized against the property. So you can claim 23,000 basically. Is your property New Build?
+**Mitch:** Yeah it's a new build.
+**Ravi:** Yeah then you just basically take off the formula and deduct the whole amount. Because it's 100% deductible.
+**Mitch:** And I have to manually do that?
+**Ravi:** Yeah. If it's a new build you have to manually do that so you can claim the whole expense for interest.
+**Mitch:** That makes sense. And so the different loan accounts are for different properties right?
+**Ravi:** Yeah it could be for different property or sometimes client have got like multiple loans for same property. So basically just rename the loan account. So say this is Kiwibank 01. So whoever picks up the returns for next year they can just figure out oh Kiwibank 01 is associated with this rental property.
+
+**15:00 - 16:00**
+**Mitch:** Okay what's next?
+**Ravi:** So next would be the rental income. Again if it was PDF and there was no property manager statement, you have to break it down each month. But now that we have got CSV... if you scroll down... it's the other one, Current Account. Yeah so you can just sum them up for rental income.
+**Mitch:** I assume you just do this right? [Mitch filters Excel]
+**Ravi:** Yeah you can do that as well. Yeah and just add them up. So it would be 24,550. So you can just put that down in the Rental Income column.
+**Mitch:** Yep.
+
+**16:00 - 17:00**
+**Ravi:** And then you have to add one more column over there just below Total Income because you have got a Bank Contribution as well. So you have to bring that in as well. So I add another line here. Just write "Bank Contributions." Again refer it back to BS (Bank Statement) and then bring the amount whatever it is. I think it was 6,400 something.
+**Mitch:** Yep. [Mitch enters data]
+**Ravi:** Yep sweet. So what's next? You have got all of that. Bank Fees. I guess there was $5 of bank fees.
+**Mitch:** Yep.
+**Ravi:** Yep and then you just add Accounting Fees. Say one rental property is $750 GST. Just below cleaning. And you would just refer that as AF because it's Accounting Fees right. And you will go with GST so it will be 750 plus GST.
+**Mitch:** Yeah so call it a thousand bucks.
+**Ravi:** Yeah.
+
+**17:00 - 18:00**
+**Ravi:** Sweet. And then... oh you have to bring in the interest as well. Bring in the Interest.
+**Mitch:** Ah yep. [Mitch enters interest data]
+**Ravi:** Sweet. I'm picking this up Neville.
+**Mitch:** Yeah you doing good.
+**Ravi:** So now you are making losses already so I wouldn't really be bothered about coming back to and requesting Home Office. But say you are making like $2,000 profit. So what we want for our client is to like not pay much tax and save as much money we can. So in that case Home Office would be handy. So even if it's like say they have made Home Office expense of $1,000, it still adds a lot you know. But in this case I wouldn't really be bothered going back. But yes you have to bring in the Settlement Statement as well because you might have paid the legal fees. So manually code them in.
+
+**18:00 - 19:00**
+**Mitch:** Just say I paid legal fees of $4,000, I would just put it in here?
+**Ravi:** Yeah. And then you might have paid some rates as well when you purchased the property so you have to add those on top of 2,160.
+**Mitch:** Right that's why you want the settlement statements.
+**Ravi:** Yes that's why you want the settlement statement so you can bring in all the rates, body corps.
+**Mitch:** F\*\*\*, this makes so much more sense.
+**Ravi:** Yeah gotcha. If you open the front page I can brief you through.
+**Mitch:** The front page?
+**Ravi:** Yeah front page of settlement statement. No the other one please. Yeah.
+**Mitch:** Man Google Drive...
+**Ravi:** Yeah it's f\*\*\*ed man. It's giving issues to everyone.
+**Mitch:** It is a nice day.
+**Ravi:** F\*\*\*ing so nice man. I've got few mates coming over for tonight's game. We're gonna be f\*\*\*ing drinking out here.
+
+**19:00 - 20:00**
+**Mitch:** Okay so I think I kind of understand it though.
+**Ravi:** Yeah so you know how front page has got like the purchase price of the property... and there could be body cop or rates you have paid. So that's first page. And the second page of the settlement statement would show you the loan drawdown amount or the legal fees you paid. So basically you can claim all of those.
+**Mitch:** Only if your intentions while purchasing the property was investment property. Only then. But if you have purchased the property, you have moved in for like 8 months and then you have put it on rent, then you can't claim it.
+**Ravi:** Yeah. That be making sense Neville.
+
+**20:00 - 21:00**
+[Mitch opens settlement statement PDF]
+**Ravi:** Ah yeah sweet. So you know how the front page says Purchase Price. And you have paid $80,000 deposit. So basically how you would calculate rates over here is 552 minus 162.91. Because that's the time period the vendor has used before they sold the property. So that's the vendor rate portion and that's your rates portion. 552.
+**Mitch:** Yeah so you obviously can't claim the time that the vendor...
+**Ravi:** No yeah definitely yeah. So you have to minus that. So 552 minus 162.91.
+**Mitch:** Yeah.
+**Ravi:** Yeah you add that... no so it will be...
+**Mitch:** Wouldn't it be 552... oh wait sorry explain it again?
+**Ravi:** So go 552.09 minus 162.91. So that be 389.18. So that would be basically 2160.36 plus 389.18.
+**Mitch:** And where did you get the 2...? Oh yeah yeah yeah.
+**Ravi:** Because you have already paid 2160 from the time you have owned the property.
+**Mitch:** Yeah that perfect. Yeah cool.
+
+**21:00 - 22:00**
+**Ravi:** And then on the second page there might be legal fees. Oh then Body Corp as well. You can get a Body Corp off that. So you have paid 2359. So you just change that for Body Corp.
+**Mitch:** And there is a Interest Earned on property... on the deposit paid. So you have to bring that as an income as well. Do you just go Interest Earned?
+**Ravi:** Yeah Interest Income or whatever yeah. And I go SS for Settlement Statement I imagine?
+**Mitch:** Yeah perfect. And you would change that for Body Corp. So with rates it will be BS/SS because you have got rates from bank statement and settlement statement.
+**Ravi:** Yeah cool.
+
+**22:00 - 23:00**
+**Ravi:** Yeah and then you scroll down there must be one more page. Yeah keep scrolling. No. So then you open the next page, like the other document they have provided. Ah yeah sweet. So then you have drawn down loan of... no you have used KiwiSaver of 34,000. Deposit 45,000 so that adds up to 80,000. Cash Contribution while paying so you added 82,000 more. You have drawn down Kiwibank loan of 640,000. And the legal fees is $1200 plus 298 so you can claim that as well. So it will be 1498.70. Plus 224... that's GST so you can claim that as well. So you can claim the whole amount as a Legal Fees Paid.
+**Mitch:** So 1200 plus 298.70 plus 224.8.
+**Ravi:** Yeah so that's basically it for this one I guess. There is nothing much more we can do about this. And if you have done like any due diligence like valuation report or property report before purchasing a property you can still claim that as well.
+
+**23:00 - 24:00**
+**Mitch:** Gotcha. So if I open the one that was completed it should end up fairly the same.
+**Ravi:** Yeah. [Mitch compares sheets] Alright. Bank Fees, Body Corp 2359, Interest Expense. I don't know why they have calculated 27. So the Body Corps... accurate... the Bank Fees accurate... the Rates...
+**Mitch:** But do you think cause Amanda did this... she would basically be trying... like as soon as she makes a loss she might have just stopped looking?
+**Ravi:** Could be but because I'm not sure why rates are different. Because you have paid rates as well.
+**Mitch:** Yeah I think... to be honest I don't think when we go to this one... I don't think that payment was a rates payment. This one. I don't think that's a rates payment.
+**Ravi:** Oh no that's not rates yeah. It's paid so it's a drawings. That one's drawings. So it would be 552 plus the rates you paid during settlement.
+**Mitch:** Yeah I'm just gonna go... minus 1608.27. Yeah that makes sense.
+**Ravi:** And then she hasn't included legal expenses.
+**Mitch:** Yeah. Why is the interest expense different? That's interesting.
+**Ravi:** Yeah because that's what we have got off the CSV so I don't know how she has got...
+
+**24:00 - 25:00**
+**Mitch:** Ah wait... is it from August 23... August 20... September... October... November... December... January... February... Yeah that's fine. That looks fine to me.
+**Ravi:** Or what she has done is 29,070 minus the interest earned. She has just deducted that so that's why it brings down to 27,367.
+**Mitch:** Ah, right. That makes sense now. But we have got it separate.
+**Ravi:** As I said it just depends on how you do it.
+**Mitch:** And she's done Bank Contribution... Water Rates Recovered... But then why is the outcome so different? Is that because...
+**Ravi:** She has not added legal fees. So if you take out the interest earned and minus that from the interest you have paid... 1703...
+**Mitch:** Ah sorry... Interest Earned...
+**Ravi:** Yeah just take that out and minus that from the interest expense.
+**Mitch:** 1703.03.
+**Ravi:** That matches up with Amanda.
+**Mitch:** Yeah right. And I think the only difference now is that she has not included legal fees. So if I take that out... and the Accounting Fees. Ah come on Amanda.
+**Ravi:** Yeah that adds up now.
+**Mitch:** Gotcha.
+**Ravi:** So as I said it's just different way of doing it but you just have to figure out why it was done like this. That's pretty much it.
+
+**25:00 - 25:35**
+**Mitch:** Okay cool. This is good. And this is like... do you come across this situation fairly often right? One individually owned new build investment property?
+**Ravi:** Yeah.
+**Mitch:** And this would take you what... maybe half an hour to complete?
+**Ravi:** Yeah if I have got all the information I would smash it out in like 40-45 minutes including like cover letters and everything.
+**Mitch:** What about say Rishi or Maggie? How long that would take them?
+**Ravi:** Ah I don't know about Maggie but... because like just one day I have spent with her right so I don't really know. But she's picking up well.
+**Mitch:** What about Rishi then? An hour?
+**Ravi:** Rishi an hour to hour 15 maybe.
+**Mitch:** Cool okay. This is a good start. All right I won't take up any more of your time Neville. Thank you very much.
+**Ravi:** No worries man, that's fine. Appreciate it.
+**Mitch:** No worries. Any more help just give me a call and I'll...
+**Ravi:** Yeah I might flick you a little Slack if I come across any more issues.
+**Mitch:** Sweet no worries.
+**Ravi:** Cool thank you very much.
+**Mitch:** Cheers, thank you guys. Have a good one bro. See ya man.
