@@ -1,56 +1,218 @@
 {% extends "base.html" %}
 
-{% block title %}Review Result - Property Tax{% endblock %}
+{% block title %}{{ tax_return.property_address }} - Review{% endblock %}
 
 {% block content %}
-<div class="w-full space-y-6" x-data="transactionProcessor()">
-    <!-- Status Header -->
-    <div class="bg-white shadow rounded-lg p-6">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-4">
-                <div>
-                    <h2 class="text-2xl font-bold text-primary">Tax Return Review Result</h2>
-                    <p class="mt-1 text-sm text-gray-500">ID: {{ tax_return.id }}</p>
-                </div>
+{# Calculate counts for dashboard #}
+{% set provided_count = document_inventory.provided|length if document_inventory else 0 %}
+{% set missing_count = document_inventory.missing|length if document_inventory else 0 %}
+{% set flagged_count = review.flagged_transactions_summary.total_flagged if review.flagged_transactions_summary else 0 %}
+{% set blocking_count = review.blocking_issues|length if review.blocking_issues else 0 %}
 
-                <!-- Status Badge -->
-                {% if tax_return.status.value == "complete" %}
-                <div class="px-4 py-2 bg-green-100 text-green-800 rounded-full font-medium text-sm">
-                    COMPLETE
+<div class="w-full space-y-6" x-data="transactionProcessor()">
+
+    <!-- Progress Stepper -->
+    <div class="bg-white shadow rounded-lg p-4">
+        <div class="flex items-center justify-between max-w-3xl mx-auto">
+            <!-- Step 1: Upload -->
+            <div class="flex items-center">
+                <div class="flex items-center justify-center w-10 h-10 rounded-full bg-green-500 text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
                 </div>
-                {% elif tax_return.status.value == "blocked" %}
-                <div class="px-4 py-2 bg-red-100 text-red-800 rounded-full font-medium text-sm">
-                    BLOCKED
+                <span class="ml-2 text-sm font-medium text-primary">Upload</span>
+            </div>
+            <div class="flex-1 h-1 mx-4 bg-green-500"></div>
+
+            <!-- Step 2: Classification -->
+            <div class="flex items-center">
+                <div class="flex items-center justify-center w-10 h-10 rounded-full bg-green-500 text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
                 </div>
-                {% elif tax_return.status.value == "incomplete" %}
-                <div class="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-full font-medium text-sm">
-                    INCOMPLETE
+                <span class="ml-2 text-sm font-medium text-primary">Classified</span>
+            </div>
+            <div class="flex-1 h-1 mx-4 {% if tax_return.status.value == 'complete' %}bg-green-500{% else %}bg-slate{% endif %}"></div>
+
+            <!-- Step 3: Review -->
+            <div class="flex items-center">
+                {% if tax_return.status.value == 'complete' %}
+                <div class="flex items-center justify-center w-10 h-10 rounded-full bg-green-500 text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                {% elif tax_return.status.value == 'blocked' %}
+                <div class="flex items-center justify-center w-10 h-10 rounded-full bg-red-500 text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
                 </div>
                 {% else %}
-                <div class="px-4 py-2 bg-gray-100 text-gray-800 rounded-full font-medium text-sm">
-                    PENDING
+                <div class="flex items-center justify-center w-10 h-10 rounded-full bg-accent text-white animate-pulse">
+                    <span class="text-sm font-bold">3</span>
                 </div>
+                {% endif %}
+                <span class="ml-2 text-sm font-medium {% if tax_return.status.value == 'blocked' %}text-red-600{% elif tax_return.status.value == 'complete' %}text-primary{% else %}text-accent{% endif %}">Review</span>
+            </div>
+            <div class="flex-1 h-1 mx-4 bg-slate"></div>
+
+            <!-- Step 4: Workings -->
+            <div class="flex items-center">
+                <div class="flex items-center justify-center w-10 h-10 rounded-full bg-slate text-gray-500">
+                    <span class="text-sm font-bold">4</span>
+                </div>
+                <span class="ml-2 text-sm font-medium text-gray-500">Workings</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Stats Row -->
+    <div class="bg-white shadow rounded-lg p-4">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <!-- Status -->
+            <div class="flex items-center gap-3">
+                <span class="text-sm text-gray-500">Status:</span>
+                <span class="px-3 py-1 rounded-full text-sm font-medium
+                    {% if tax_return.status.value == 'complete' %}bg-green-100 text-green-800
+                    {% elif tax_return.status.value == 'blocked' %}bg-red-100 text-red-800
+                    {% elif tax_return.status.value == 'incomplete' %}bg-yellow-100 text-yellow-800
+                    {% else %}bg-slate-light text-primary{% endif %}">
+                    {{ tax_return.status.value|upper }}
+                </span>
+            </div>
+
+            <!-- Documents -->
+            <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-slate" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span class="text-sm text-primary"><strong>{{ provided_count }}</strong> documents</span>
+                {% if missing_count > 0 %}
+                <span class="text-sm text-accent">({{ missing_count }} missing)</span>
                 {% endif %}
             </div>
 
-            <!-- Action Buttons -->
-            <div class="flex items-center gap-3">
-                <!-- Add Documents Button -->
+            <!-- Issues -->
+            <div class="flex items-center gap-2">
+                {% if blocking_count > 0 %}
+                <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <span class="text-sm text-red-600"><strong>{{ blocking_count }}</strong> blocking</span>
+                {% elif flagged_count > 0 %}
+                <svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <span class="text-sm text-yellow-600"><strong>{{ flagged_count }}</strong> to review</span>
+                {% else %}
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="text-sm text-green-600">No issues</span>
+                {% endif %}
+            </div>
+
+            <!-- Tax Year -->
+            <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-slate" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <span class="text-sm text-primary"><strong>{{ tax_return.tax_year }}</strong> (Year {{ tax_return.year_of_ownership }})</span>
+            </div>
+
+            <!-- Proceed to Workings -->
+            {% if tax_return.status.value != 'blocked' %}
+            <a href="/workings/{{ tax_return.id }}"
+               class="inline-flex items-center px-4 py-2 bg-accent hover:bg-accent-600 text-white rounded-lg font-medium text-sm shadow-sm transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                </svg>
+                {% if tax_return.status.value == 'complete' %}Generate Workings{% else %}View Workings{% endif %}
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Next Steps Card -->
+    <div class="bg-gradient-to-r {% if tax_return.status.value == 'blocked' %}from-red-50 to-red-100 border-red-200{% elif tax_return.status.value == 'incomplete' %}from-yellow-50 to-amber-50 border-yellow-200{% elif tax_return.status.value == 'complete' %}from-green-50 to-emerald-50 border-green-200{% else %}from-slate-light to-slate border-slate{% endif %} border rounded-lg p-6">
+        <div class="flex items-start gap-4">
+            <div class="flex-shrink-0">
+                {% if tax_return.status.value == 'blocked' %}
+                <div class="p-3 bg-red-200 rounded-full">
+                    <svg class="w-6 h-6 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+                {% elif tax_return.status.value == 'incomplete' %}
+                <div class="p-3 bg-yellow-200 rounded-full">
+                    <svg class="w-6 h-6 text-yellow-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+                {% elif tax_return.status.value == 'complete' %}
+                <div class="p-3 bg-green-200 rounded-full">
+                    <svg class="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                {% else %}
+                <div class="p-3 bg-white rounded-full">
+                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                {% endif %}
+            </div>
+            <div class="flex-grow">
+                <h3 class="text-lg font-semibold {% if tax_return.status.value == 'blocked' %}text-red-900{% elif tax_return.status.value == 'incomplete' %}text-yellow-900{% elif tax_return.status.value == 'complete' %}text-green-900{% else %}text-primary{% endif %}">
+                    {% if tax_return.status.value == 'blocked' %}
+                    Action Required: Resolve Blocking Issues
+                    {% elif tax_return.status.value == 'incomplete' %}
+                    Next Step: Add Missing Documents
+                    {% elif tax_return.status.value == 'complete' %}
+                    Ready to Generate Workings!
+                    {% else %}
+                    Processing In Progress
+                    {% endif %}
+                </h3>
+                <p class="mt-1 text-sm {% if tax_return.status.value == 'blocked' %}text-red-700{% elif tax_return.status.value == 'incomplete' %}text-yellow-800{% elif tax_return.status.value == 'complete' %}text-green-700{% else %}text-primary-700{% endif %}">
+                    {% if tax_return.status.value == 'blocked' %}
+                    There are {{ blocking_count }} blocking issue{{ 's' if blocking_count > 1 else '' }} that must be resolved before proceeding. Review the issues below and either provide the correct documents or confirm the issue is not applicable.
+                    {% elif tax_return.status.value == 'incomplete' %}
+                    <span class="block">Missing documents:</span>
+                    <ul class="mt-2 space-y-1">
+                        {% for doc in document_inventory.missing %}
+                        <li class="flex items-center gap-2">
+                            {% if doc.severity == 'required' %}
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">Required</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700">Recommended</span>
+                            {% endif %}
+                            <span>{{ doc.reason }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <span class="block mt-2 text-yellow-700">Add the missing documents or proceed with available data.</span>
+                    {% elif tax_return.status.value == 'complete' %}
+                    All required documents are provided and classified. Click "Generate Workings" to create the P&L breakdown with full audit trail.
+                    {% else %}
+                    Documents are being processed. Please wait for classification to complete.
+                    {% endif %}
+                </p>
+            </div>
+            <div class="flex-shrink-0">
+                {% if tax_return.status.value in ['incomplete', 'blocked'] %}
                 <button onclick="toggleAddDocuments()"
-                        class="inline-flex items-center px-4 py-2 border border-accent text-accent rounded-md hover:bg-rose-light font-medium text-sm">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="inline-flex items-center px-4 py-2.5 bg-white border-2 border-yellow-300 text-yellow-800 rounded-lg hover:bg-yellow-50 font-medium text-sm transition-colors">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                     </svg>
                     Add Documents
                 </button>
-                <!-- View Workings Button -->
-                <a href="/workings/{{ tax_return.id }}"
-                   class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium text-sm">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    View Workings →
-                </a>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -108,52 +270,60 @@
         </form>
     </div>
 
-    <!-- Client & Property Details -->
-    <div class="bg-white shadow rounded-lg p-6">
-        <h3 class="text-lg font-medium text-primary mb-4">Property Details</h3>
+    <!-- Property Details - Compact Header -->
+    <div class="bg-white shadow rounded-lg p-4">
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <!-- Property Address & Client -->
+            <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                </svg>
+                <div>
+                    <span class="font-semibold text-gray-900">{{ tax_return.property_address }}</span>
+                    <span class="text-gray-400 mx-2">|</span>
+                    <span class="text-gray-600">{{ client.name }}</span>
+                </div>
+            </div>
 
-        <dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-            <div>
-                <dt class="text-sm font-medium text-gray-500">Client Name</dt>
-                <dd class="mt-1 text-sm text-gray-900">{{ client.name }}</dd>
+            <!-- Property Tags -->
+            <div class="flex flex-wrap items-center gap-2 ml-auto">
+                <!-- Property Type -->
+                {% if tax_return.property_type.value == "new_build" %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary">
+                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                    New Build (100% Interest)
+                </span>
+                {% elif tax_return.property_type.value == "existing" %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
+                    Existing (80% Interest)
+                </span>
+                {% else %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-light text-accent">
+                    Type: Not Sure
+                </span>
+                {% endif %}
+
+                <!-- GST Status -->
+                {% if tax_return.gst_registered is none %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-light text-accent">
+                    GST: Not Sure
+                </span>
+                {% elif tax_return.gst_registered %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-accent-100 text-accent">
+                    GST Registered
+                </span>
+                {% else %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-light text-primary-700">
+                    Not GST Registered
+                </span>
+                {% endif %}
+
+                <!-- Year of Ownership -->
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-light text-primary">
+                    Year {{ tax_return.year_of_ownership }}
+                </span>
             </div>
-            <div>
-                <dt class="text-sm font-medium text-gray-500">Property Address</dt>
-                <dd class="mt-1 text-sm text-gray-900">{{ tax_return.property_address }}</dd>
-            </div>
-            <div>
-                <dt class="text-sm font-medium text-gray-500">Tax Year</dt>
-                <dd class="mt-1 text-sm text-gray-900">{{ tax_return.tax_year }}</dd>
-            </div>
-            <div>
-                <dt class="text-sm font-medium text-gray-500">Property Type</dt>
-                <dd class="mt-1 text-sm text-gray-900">
-                    {% if tax_return.property_type.value == "new_build" %}
-                        New Build
-                    {% elif tax_return.property_type.value == "existing" %}
-                        Existing Property
-                    {% else %}
-                        <span class="text-yellow-600">Not Sure (User selected)</span>
-                    {% endif %}
-                </dd>
-            </div>
-            <div>
-                <dt class="text-sm font-medium text-gray-500">GST Registered</dt>
-                <dd class="mt-1 text-sm text-gray-900">
-                    {% if tax_return.gst_registered is none %}
-                        <span class="text-yellow-600">Not Sure (User selected)</span>
-                    {% elif tax_return.gst_registered %}
-                        Yes
-                    {% else %}
-                        No
-                    {% endif %}
-                </dd>
-            </div>
-            <div>
-                <dt class="text-sm font-medium text-gray-500">Year of Ownership</dt>
-                <dd class="mt-1 text-sm text-gray-900">Year {{ tax_return.year_of_ownership }}</dd>
-            </div>
-        </dl>
+        </div>
     </div>
 
     <!-- AI Property Type Suggestion (when user selected "Not Sure") -->
@@ -306,7 +476,7 @@
                         OK
                     </button>
                     <button onclick="handleBlockingIssueFeedback(this)"
-                            class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 transition-colors">
+                            class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-primary-700 bg-slate-light hover:bg-slate transition-colors">
                         <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
                         </svg>
@@ -326,8 +496,8 @@
     <div id="blockingIssueFeedbackModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Provide Feedback</h3>
-                <button onclick="closeBlockingIssueFeedbackModal()" class="text-gray-400 hover:text-gray-600">
+                <h3 class="text-lg font-semibold text-primary">Provide Feedback</h3>
+                <button onclick="closeBlockingIssueFeedbackModal()" class="text-slate hover:text-primary">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
@@ -336,26 +506,26 @@
             <form id="blockingIssueFeedbackForm" onsubmit="submitBlockingIssueFeedback(event)">
                 <input type="hidden" id="blockingIssueText" name="issue_text">
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Blocking Issue</label>
-                    <p id="blockingIssueDisplay" class="text-sm text-gray-600 bg-gray-50 p-2 rounded"></p>
+                    <label class="block text-sm font-medium text-primary-700 mb-1">Blocking Issue</label>
+                    <p id="blockingIssueDisplay" class="text-sm text-primary-700 bg-cream p-2 rounded"></p>
                 </div>
                 <div class="mb-4">
-                    <label for="blockingIssueFeedbackContent" class="block text-sm font-medium text-gray-700 mb-1">
+                    <label for="blockingIssueFeedbackContent" class="block text-sm font-medium text-primary-700 mb-1">
                         Why shouldn't this be a blocking issue?
                     </label>
                     <textarea id="blockingIssueFeedbackContent" name="feedback_content" rows="4"
-                              class="w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                              class="w-full border border-slate rounded-md shadow-sm focus:ring-accent focus:border-accent"
                               placeholder="Explain why this is a false positive and shouldn't block the tax return..."
                               required></textarea>
-                    <p class="mt-1 text-xs text-gray-500">This feedback will be stored to prevent similar false positives in the future.</p>
+                    <p class="mt-1 text-xs text-slate">This feedback will be stored to prevent similar false positives in the future.</p>
                 </div>
                 <div class="flex justify-end gap-3">
                     <button type="button" onclick="closeBlockingIssueFeedbackModal()"
-                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+                            class="px-4 py-2 text-sm font-medium text-primary-700 bg-slate-light rounded-md hover:bg-slate">
                         Cancel
                     </button>
                     <button type="submit" id="blockingIssueFeedbackSubmit"
-                            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                            class="px-4 py-2 text-sm font-medium text-white bg-accent rounded-md hover:bg-accent-600">
                         Submit Feedback
                     </button>
                 </div>
@@ -526,641 +696,120 @@
     </div>
     {% endif %}
 
-    <!-- Document Inventory Section -->
-    {% if document_inventory %}
+    <!-- Documents Section -->
     <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         <!-- Header -->
-        <div class="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-200">
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
             <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-indigo-100 rounded-lg">
-                        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900">Document Inventory</h3>
-                        <p class="text-sm text-gray-600">Overview of documents for tax return processing</p>
-                    </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-primary">Source Documents</h3>
+                    <p class="text-sm text-gray-600">{{ documents|length }} document{{ 's' if documents|length > 1 else '' }} uploaded</p>
                 </div>
-                <div class="flex items-center gap-2">
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        {{ document_inventory.provided|length }} Provided
-                    </span>
-                    {% if document_inventory.missing|length > 0 %}
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                        {{ document_inventory.missing|length }} Missing
-                    </span>
-                    {% endif %}
-                    {% if document_inventory.excluded|length > 0 %}
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                        {{ document_inventory.excluded|length }} Excluded
-                    </span>
+                <div class="text-sm text-gray-500">
+                    {% set total_txns = 0 %}
+                    {% for doc in documents %}
+                        {% if doc.extracted_data and doc.extracted_data.transactions %}
+                            {% set total_txns = total_txns + doc.extracted_data.transactions|length %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if total_txns > 0 %}
+                    <span class="font-medium text-primary">{{ total_txns }} transactions</span> extracted
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- Inventory Content -->
-        <div class="p-6 space-y-6">
-            <!-- Key Document Status -->
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <div class="flex items-center gap-2 p-3 rounded-lg {{ 'bg-green-50 border border-green-200' if document_inventory.has_pm_statement else 'bg-gray-50 border border-gray-200' }}">
-                    {% if document_inventory.has_pm_statement %}
-                    <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                    </svg>
-                    {% else %}
-                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                    </svg>
-                    {% endif %}
-                    <span class="text-xs font-medium {{ 'text-green-700' if document_inventory.has_pm_statement else 'text-gray-500' }}">PM Statement</span>
-                </div>
-                <div class="flex items-center gap-2 p-3 rounded-lg {{ 'bg-green-50 border border-green-200' if document_inventory.has_bank_statement else 'bg-gray-50 border border-gray-200' }}">
-                    {% if document_inventory.has_bank_statement %}
-                    <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                    </svg>
-                    {% else %}
-                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                    </svg>
-                    {% endif %}
-                    <span class="text-xs font-medium {{ 'text-green-700' if document_inventory.has_bank_statement else 'text-gray-500' }}">Bank Statement</span>
-                </div>
-                <div class="flex items-center gap-2 p-3 rounded-lg {{ 'bg-green-50 border border-green-200' if document_inventory.has_loan_statement else 'bg-gray-50 border border-gray-200' }}">
-                    {% if document_inventory.has_loan_statement %}
-                    <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                    </svg>
-                    {% else %}
-                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                    </svg>
-                    {% endif %}
-                    <span class="text-xs font-medium {{ 'text-green-700' if document_inventory.has_loan_statement else 'text-gray-500' }}">Loan Statement</span>
-                </div>
-                <div class="flex items-center gap-2 p-3 rounded-lg {{ 'bg-green-50 border border-green-200' if document_inventory.has_rates_invoice else 'bg-gray-50 border border-gray-200' }}">
-                    {% if document_inventory.has_rates_invoice %}
-                    <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                    </svg>
-                    {% else %}
-                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                    </svg>
-                    {% endif %}
-                    <span class="text-xs font-medium {{ 'text-green-700' if document_inventory.has_rates_invoice else 'text-gray-500' }}">Rates Invoice</span>
-                </div>
-                <div class="flex items-center gap-2 p-3 rounded-lg {{ 'bg-green-50 border border-green-200' if document_inventory.has_insurance_policy else 'bg-gray-50 border border-gray-200' }}">
-                    {% if document_inventory.has_insurance_policy %}
-                    <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                    </svg>
-                    {% else %}
-                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                    </svg>
-                    {% endif %}
-                    <span class="text-xs font-medium {{ 'text-green-700' if document_inventory.has_insurance_policy else 'text-gray-500' }}">Insurance</span>
-                </div>
-            </div>
-
-            <!-- Provided Documents by Type -->
-            {% if document_inventory.provided %}
-            <div>
-                <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                    <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                    </svg>
-                    Provided Documents
-                </h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {% for doc in document_inventory.provided %}
-                    <div class="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
-                        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                            </svg>
-                        </div>
-                        <div class="flex-grow min-w-0">
-                            <p class="text-sm font-medium text-gray-900 truncate">{{ doc.filename }}</p>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 mt-1">
-                                {{ doc.document_type|replace('_', ' ')|title }}
-                            </span>
-                            {% if doc.relevance_notes %}
-                            <p class="text-xs text-gray-500 mt-1">{{ doc.relevance_notes }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Missing Documents -->
-            {% if document_inventory.missing %}
-            <div>
-                <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                    <svg class="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-                    </svg>
-                    Missing Documents
-                </h4>
-                <div class="space-y-2">
-                    {% for missing in document_inventory.missing %}
-                    <div class="flex items-start gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                            </svg>
-                        </div>
-                        <div class="flex-grow">
-                            <div class="flex items-center gap-2">
-                                <p class="text-sm font-medium text-yellow-800">{{ missing.document_type|replace('_', ' ')|title }}</p>
-                                {% if missing.is_required %}
-                                <span class="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">Required</span>
-                                {% else %}
-                                <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Recommended</span>
-                                {% endif %}
-                            </div>
-                            <p class="text-xs text-yellow-700 mt-1">{{ missing.reason }}</p>
-                            {% if missing.impact %}
-                            <p class="text-xs text-yellow-600 mt-1"><strong>Impact:</strong> {{ missing.impact }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Excluded Documents -->
-            {% if document_inventory.excluded %}
-            <div>
-                <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                    <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clip-rule="evenodd"></path>
-                    </svg>
-                    Excluded Documents
-                </h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {% for doc in document_inventory.excluded %}
-                    <div class="flex items-start gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg opacity-75">
-                        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
-                            </svg>
-                        </div>
-                        <div class="flex-grow min-w-0">
-                            <p class="text-sm font-medium text-gray-700 truncate">{{ doc.filename }}</p>
-                            <p class="text-xs text-gray-500 mt-1">{{ doc.exclusion_reason }}</p>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Blocking Issues from Inventory -->
-            {% if document_inventory.blocking_issues %}
-            <div>
-                <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                    <svg class="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-                    </svg>
-                    Blocking Issues
-                </h4>
-                <div class="space-y-2">
-                    {% for issue in document_inventory.blocking_issues %}
-                    <div class="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                            </svg>
-                        </div>
-                        <div class="flex-grow">
-                            <p class="text-sm font-medium text-red-800">{{ issue.issue_type|replace('_', ' ')|title }}</p>
-                            <p class="text-xs text-red-700 mt-1">{{ issue.description }}</p>
-                            {% if issue.resolution %}
-                            <p class="text-xs text-red-600 mt-1"><strong>Resolution:</strong> {{ issue.resolution }}</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Processed Documents Section -->
-    <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-        <!-- Header -->
-        <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-blue-100 rounded-lg">
-                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-primary">Processed Documents</h3>
-                        <p class="text-sm text-gray-600">{{ documents|length }} document{{ 's' if documents|length > 1 else '' }} analyzed</p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    {% set success_count = documents|rejectattr('document_type', 'equalto', 'error')|rejectattr('document_type', 'equalto', 'invalid')|list|length %}
-                    {% set error_count = documents|selectattr('document_type', 'equalto', 'error')|list|length %}
-                    {% set invalid_count = documents|selectattr('document_type', 'equalto', 'invalid')|list|length %}
-
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                        </svg>
-                        {{ success_count }} Success
-                    </span>
-                    {% if error_count > 0 %}
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-                        </svg>
-                        {{ error_count }} Error
-                    </span>
-                    {% endif %}
-                    {% if invalid_count > 0 %}
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-                        </svg>
-                        {{ invalid_count }} Invalid
-                    </span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Document Cards -->
+        <!-- Document List -->
         <div class="divide-y divide-gray-100">
             {% for doc in documents %}
-            <div class="p-4 hover:bg-gray-50 transition-colors
+            {% set txn_count = doc.extracted_data.transactions|length if doc.extracted_data and doc.extracted_data.transactions else 0 %}
+            <div class="px-6 py-3 flex items-center gap-4 hover:bg-gray-50
                 {% if doc.document_type == 'error' %}bg-red-50
-                {% elif doc.document_type == 'invalid' %}bg-yellow-50
-                {% elif doc.is_duplicate %}bg-amber-50
+                {% elif doc.document_type == 'invalid' or doc.document_type == 'other' %}bg-yellow-50
+                {% elif doc.is_duplicate %}bg-gray-100 opacity-60
                 {% endif %}">
-                <div class="flex items-start gap-4">
-                    <!-- Status Icon -->
-                    <div class="flex-shrink-0">
-                        {% if doc.document_type == 'error' %}
-                        <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        {% elif doc.document_type == 'invalid' %}
-                        <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                            </svg>
-                        </div>
-                        {% elif doc.is_duplicate %}
-                        <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                            </svg>
-                        </div>
-                        {% else %}
-                        <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        {% endif %}
-                    </div>
 
-                    <!-- Document Details -->
-                    <div class="flex-grow min-w-0">
-                        <div class="flex items-start justify-between gap-4">
-                            <div class="min-w-0 flex-grow">
-                                <!-- Filename -->
-                                <p class="text-sm font-medium text-gray-900 truncate" title="{{ doc.original_filename }}">
-                                    {{ doc.original_filename }}
-                                </p>
-
-                                <!-- Tags Row -->
-                                <div class="mt-1.5 flex items-center gap-2 flex-wrap">
-                                    <!-- Document Type Badge -->
-                                    {% if doc.document_type %}
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-                                        {% if doc.document_type == 'error' %}bg-red-100 text-red-700
-                                        {% elif doc.document_type == 'invalid' %}bg-yellow-100 text-yellow-700
-                                        {% elif doc.document_type == 'bank_statement' %}bg-blue-100 text-blue-700
-                                        {% elif doc.document_type == 'loan_statement' %}bg-purple-100 text-purple-700
-                                        {% elif doc.document_type == 'landlord_insurance' %}bg-green-100 text-green-700
-                                        {% elif doc.document_type == 'rates' or doc.document_type == 'water_rates' %}bg-teal-100 text-teal-700
-                                        {% elif doc.document_type == 'ccc' %}bg-indigo-100 text-indigo-700
-                                        {% elif doc.document_type == 'settlement_statement' %}bg-pink-100 text-pink-700
-                                        {% elif doc.document_type == 'property_manager_statement' %}bg-cyan-100 text-cyan-700
-                                        {% elif doc.document_type == 'maintenance_invoice' %}bg-orange-100 text-orange-700
-                                        {% else %}bg-gray-100 text-gray-700{% endif %}">
-                                        {{ doc.document_type|replace('_', ' ')|title }}
-                                    </span>
-                                    {% endif %}
-
-                                    <!-- Confidence Badge -->
-                                    {% if doc.classification_confidence %}
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-                                        {% if doc.classification_confidence >= 0.9 %}bg-green-50 text-green-700
-                                        {% elif doc.classification_confidence >= 0.7 %}bg-blue-50 text-blue-700
-                                        {% else %}bg-yellow-50 text-yellow-700{% endif %}">
-                                        {% if doc.classification_confidence >= 0.9 %}
-                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                                        {% endif %}
-                                        {{ "%.0f"|format(doc.classification_confidence * 100) }}% confident
-                                    </span>
-                                    {% endif %}
-
-                                    <!-- Duplicate Badge -->
-                                    {% if doc.is_duplicate %}
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
-                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2"></path></svg>
-                                        Duplicate
-                                    </span>
-                                    {% endif %}
-                                </div>
-
-                                <!-- Key Details (only show inline if 3 or fewer, otherwise use collapsible) -->
-                                {% if doc.extracted_data and doc.extracted_data.key_details and doc.extracted_data.key_details|length <= 3 %}
-                                <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                                    {% for key, value in doc.extracted_data.key_details.items() %}
-                                    {% if key not in ['flags', 'transaction_analysis', 'error'] and value %}
-                                    {% set str_value = value|string %}
-                                    <span><strong class="text-gray-600">{{ key|replace('_', ' ')|title }}:</strong> {{ str_value if str_value|length < 50 else str_value[:47] + '...' }}</span>
-                                    {% endif %}
-                                    {% endfor %}
-                                </div>
-                                {% endif %}
-
-                                <!-- Error Message -->
-                                {% if doc.document_type == 'error' and doc.extracted_data and doc.extracted_data.key_details %}
-                                <div class="mt-2 text-xs text-red-600">
-                                    {{ doc.extracted_data.key_details.get('error', 'Processing failed') }}
-                                </div>
-                                {% endif %}
-
-                                <!-- Duplicate Info -->
-                                {% if doc.is_duplicate and doc.extracted_data and doc.extracted_data.duplicate_info %}
-                                <div class="mt-2 text-xs text-amber-600">
-                                    Duplicate of: {{ doc.extracted_data.duplicate_info.original_filename }}
-                                </div>
-                                {% endif %}
-                            </div>
-
-                            <!-- Action Buttons -->
-                            <div class="flex-shrink-0 flex items-center gap-2">
-                                {% if doc.extracted_data and doc.extracted_data.key_details and doc.extracted_data.key_details|length > 3 %}
-                                <button onclick="toggleDocumentDetails('{{ doc.id }}')"
-                                        id="details-btn-{{ doc.id }}"
-                                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors">
-                                    <svg class="w-3.5 h-3.5 mr-1.5 transition-transform duration-200" id="details-icon-{{ doc.id }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                    </svg>
-                                    <span id="details-text-{{ doc.id }}">Show Details</span>
-                                </button>
-                                {% endif %}
-                                <button onclick="reportDocumentIssue('{{ doc.id }}', '{{ doc.original_filename }}', '{{ doc.document_type }}')"
-                                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 transition-colors">
-                                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                                    </svg>
-                                    Report Issue
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Collapsible Details Panel -->
-                        {% if doc.extracted_data and doc.extracted_data.key_details and doc.extracted_data.key_details|length > 3 %}
-                        <div id="details-panel-{{ doc.id }}" class="hidden mt-4 pt-4 border-t border-gray-200" style="display: none;">
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {% for key, value in doc.extracted_data.key_details.items() %}
-                                {% if key not in ['flags', 'transaction_analysis'] and value %}
-                                <div class="bg-gray-50 rounded-lg p-3">
-                                    <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ key|replace('_', ' ') }}</dt>
-                                    <dd class="mt-1 text-sm text-gray-900">
-                                        {% set str_val = value|string %}
-                                        {% if str_val|length > 100 %}
-                                        {{ str_val[:100] }}...
-                                        {% else %}
-                                        {{ str_val }}
-                                        {% endif %}
-                                    </dd>
-                                </div>
-                                {% endif %}
-                                {% endfor %}
-                            </div>
-                            {% if doc.extracted_data.flags %}
-                            <div class="mt-3 pt-3 border-t border-gray-100">
-                                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Flags</dt>
-                                <div class="flex flex-wrap gap-1">
-                                    {% for flag in doc.extracted_data.flags %}
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
-                                        {{ flag|replace('_', ' ')|title }}
-                                    </span>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% endif %}
-                    </div>
+                <!-- Status Icon -->
+                {% if doc.document_type == 'error' %}
+                <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
                 </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-
-    <!-- Missing Documents -->
-    {% if review.missing_documents %}
-    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-        <h3 class="text-lg font-medium text-yellow-900 mb-4">Missing Documents</h3>
-        <ul class="space-y-3">
-            {% for missing in review.missing_documents %}
-            <li class="flex items-start">
-                <span class="text-yellow-600 mr-2">•</span>
-                <div>
-                    <div class="font-medium text-gray-900">
-                        {{ missing.description }}
-                        {% if missing.required %}
-                        <span class="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">REQUIRED</span>
-                        {% endif %}
-                    </div>
-                    <div class="text-sm text-gray-600 mt-1">Impact: {{ missing.impact }}</div>
+                {% elif doc.document_type == 'invalid' or doc.document_type == 'other' %}
+                <div class="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"></path>
+                    </svg>
                 </div>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
-
-    <!-- Recommendations -->
-    {% if review.recommendations %}
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 class="text-lg font-medium text-blue-900 mb-4">Recommendations</h3>
-        <ul class="space-y-2">
-            {% for rec in review.recommendations %}
-            <li class="flex items-start">
-                <span class="text-blue-600 mr-2">→</span>
-                <span class="text-gray-700">{{ rec }}</span>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
-
-    <!-- Summary -->
-    <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
-        <h3 class="text-lg font-medium text-primary mb-4">Review Summary</h3>
-
-        <!-- Overview Stats -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-white rounded-lg p-4 border border-gray-200">
-                <div class="text-2xl font-bold text-blue-600">{{ documents|length }}</div>
-                <div class="text-sm text-gray-500">Documents Processed</div>
-            </div>
-            <div class="bg-white rounded-lg p-4 border border-gray-200">
-                <div class="text-2xl font-bold text-green-600">
-                    {{ documents|selectattr('document_type')|rejectattr('document_type', 'equalto', 'error')|rejectattr('document_type', 'equalto', 'invalid')|list|length }}
+                {% elif doc.is_duplicate %}
+                <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2"></path>
+                    </svg>
                 </div>
-                <div class="text-sm text-gray-500">Successfully Classified</div>
-            </div>
-            <div class="bg-white rounded-lg p-4 border border-gray-200">
-                <div class="text-2xl font-bold text-orange-600">
-                    {{ review.flagged_transactions_summary.total_flagged if review.flagged_transactions_summary else 0 }}
-                </div>
-                <div class="text-sm text-gray-500">Flagged Transactions</div>
-            </div>
-            <div class="bg-white rounded-lg p-4 border border-gray-200">
-                <div class="text-2xl font-bold text-red-600">
-                    {{ review.blocking_issues|length if review.blocking_issues else 0 }}
-                </div>
-                <div class="text-sm text-gray-500">Blocking Issues</div>
-            </div>
-        </div>
-
-        <!-- Document Types Found -->
-        <div class="mb-6">
-            <h4 class="text-sm font-semibold text-gray-700 mb-2">Document Types Identified</h4>
-            <div class="flex flex-wrap gap-2">
-                {% set doc_types = documents|map(attribute='document_type')|select|list %}
-                {% set unique_types = doc_types|unique|list %}
-                {% for doc_type in unique_types %}
-                {% if doc_type and doc_type != 'error' %}
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium
-                    {% if doc_type == 'invalid' %}bg-red-100 text-red-800
-                    {% elif doc_type == 'bank_statement' %}bg-blue-100 text-blue-800
-                    {% elif doc_type == 'loan_statement' %}bg-purple-100 text-purple-800
-                    {% elif doc_type == 'landlord_insurance' %}bg-green-100 text-green-800
-                    {% elif doc_type == 'rates' %}bg-yellow-100 text-yellow-800
-                    {% elif doc_type == 'ccc' %}bg-teal-100 text-teal-800
-                    {% elif doc_type == 'settlement_statement' %}bg-indigo-100 text-indigo-800
-                    {% elif doc_type == 'property_manager_statement' %}bg-pink-100 text-pink-800
-                    {% else %}bg-gray-100 text-gray-800{% endif %}">
-                    {{ doc_type|replace('_', ' ')|title }}
-                    <span class="ml-1 text-xs opacity-75">({{ doc_types|select('equalto', doc_type)|list|length }})</span>
-                </span>
-                {% endif %}
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- Interest Deductibility -->
-        {% if tax_return.property_type.value == "new_build" %}
-        <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <h4 class="text-sm font-semibold text-green-800 mb-1">Interest Deductibility</h4>
-            <p class="text-sm text-green-700">
-                <strong>100% Deductible</strong> - New build property (CCC verification required for dates after 27 March 2020)
-            </p>
-        </div>
-        {% elif tax_return.property_type.value == "existing" %}
-        <div class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <h4 class="text-sm font-semibold text-yellow-800 mb-1">Interest Deductibility</h4>
-            <p class="text-sm text-yellow-700">
-                <strong>80% Deductible</strong> - Existing property (2024/25 tax year rate)
-            </p>
-        </div>
-        {% endif %}
-
-        <!-- Completeness Score -->
-        {% if review.completeness_score %}
-        <div class="mb-6">
-            <h4 class="text-sm font-semibold text-gray-700 mb-2">Completeness Score</h4>
-            <div class="flex items-center">
-                <div class="flex-1 bg-gray-200 rounded-full h-3 max-w-md">
-                    <div class="h-3 rounded-full transition-all duration-500
-                        {% if review.completeness_score >= 0.8 %}bg-green-500
-                        {% elif review.completeness_score >= 0.5 %}bg-yellow-500
-                        {% else %}bg-red-500{% endif %}"
-                         style="width: {{ review.completeness_score * 100 }}%"></div>
-                </div>
-                <span class="ml-3 text-lg font-bold
-                    {% if review.completeness_score >= 0.8 %}text-green-600
-                    {% elif review.completeness_score >= 0.5 %}text-yellow-600
-                    {% else %}text-red-600{% endif %}">
-                    {{ "%.0f"|format(review.completeness_score * 100) }}%
-                </span>
-            </div>
-            <p class="mt-1 text-xs text-gray-500">
-                {% if review.completeness_score >= 0.8 %}
-                Excellent - Most required documents are present
-                {% elif review.completeness_score >= 0.5 %}
-                Moderate - Some important documents may be missing
                 {% else %}
-                Low - Several critical documents are missing
+                <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
                 {% endif %}
-            </p>
-        </div>
-        {% endif %}
 
-        <!-- AI Summary -->
-        {% if review.summary %}
-        <div class="border-t border-gray-200 pt-4">
-            <h4 class="text-sm font-semibold text-primary mb-2">AI Analysis Summary</h4>
-            <p class="text-sm text-gray-600 leading-relaxed">{{ review.summary }}</p>
-        </div>
-        {% endif %}
+                <!-- Document Info -->
+                <div class="flex-grow min-w-0">
+                    <p class="text-sm font-medium text-primary truncate">{{ doc.original_filename }}</p>
+                    <div class="flex items-center gap-2 mt-0.5">
+                        <span class="text-xs px-2 py-0.5 rounded
+                            {% if doc.document_type == 'bank_statement' %}bg-primary-100 text-primary
+                            {% elif doc.document_type == 'loan_statement' %}bg-primary-100 text-primary-700
+                            {% elif doc.document_type == 'property_manager_statement' %}bg-primary-100 text-primary
+                            {% elif doc.document_type == 'settlement_statement' %}bg-rose-light text-accent
+                            {% elif doc.document_type == 'landlord_insurance' %}bg-slate-light text-primary
+                            {% elif doc.document_type == 'rates' or doc.document_type == 'water_rates' %}bg-cream text-primary-700
+                            {% elif doc.document_type == 'body_corporate' %}bg-cream text-primary-700
+                            {% elif doc.document_type == 'maintenance_invoice' %}bg-rose-light text-accent-700
+                            {% elif doc.document_type == 'error' %}bg-accent-100 text-accent
+                            {% elif doc.document_type == 'invalid' %}bg-slate-light text-gray-600
+                            {% else %}bg-slate-light text-primary-700{% endif %}">
+                            {{ doc.document_type|replace('_', ' ')|title if doc.document_type else 'Unknown' }}
+                        </span>
+                        {% if doc.is_duplicate %}
+                        <span class="text-xs text-slate">Duplicate - skipped</span>
+                        {% endif %}
+                    </div>
+                </div>
 
-        <!-- Quick Actions -->
-        <div class="mt-6 pt-4 border-t border-gray-200">
-            <h4 class="text-sm font-semibold text-gray-700 mb-3">Next Steps</h4>
-            <div class="space-y-2">
-                {% if review.blocking_issues %}
-                <div class="flex items-start text-sm">
-                    <span class="text-red-500 mr-2">1.</span>
-                    <span class="text-gray-700"><strong>Resolve blocking issues</strong> - These must be addressed before the return can be processed</span>
+                <!-- Transaction Count or Status -->
+                <div class="flex-shrink-0 text-right">
+                    {% if doc.is_duplicate %}
+                    <span class="text-xs text-slate">—</span>
+                    {% elif doc.document_type == 'error' %}
+                    <span class="text-xs text-accent">Failed</span>
+                    {% elif doc.document_type in ['invalid', 'other'] %}
+                    <span class="text-xs text-accent-600">Not relevant</span>
+                    {% elif txn_count > 0 %}
+                    <span class="text-sm font-medium text-primary">{{ txn_count }}</span>
+                    <span class="text-xs text-slate block">transactions</span>
+                    {% elif doc.document_type in ['landlord_insurance', 'ccc', 'healthy_homes', 'smoke_alarm', 'meth_test', 'lim_report'] %}
+                    <span class="text-xs text-green-600">Reference doc</span>
+                    {% elif doc.document_type in ['rates', 'water_rates', 'body_corporate', 'resident_society'] %}
+                    <span class="text-xs text-slate">Invoice</span>
+                    {% else %}
+                    <span class="text-xs text-slate">—</span>
+                    {% endif %}
                 </div>
-                {% endif %}
-                {% if review.flagged_transactions_summary and review.flagged_transactions_summary.total_flagged > 0 %}
-                <div class="flex items-start text-sm">
-                    <span class="text-orange-500 mr-2">{% if review.blocking_issues %}2{% else %}1{% endif %}.</span>
-                    <span class="text-gray-700"><strong>Review flagged transactions</strong> - Reconcile each transaction or provide supporting invoices</span>
-                </div>
-                {% endif %}
-                {% if review.missing_documents %}
-                <div class="flex items-start text-sm">
-                    <span class="text-yellow-500 mr-2">{% if review.blocking_issues and review.flagged_transactions_summary %}3{% elif review.blocking_issues or review.flagged_transactions_summary %}2{% else %}1{% endif %}.</span>
-                    <span class="text-gray-700"><strong>Upload missing documents</strong> - Use the "Add Documents" button above</span>
-                </div>
-                {% endif %}
-                {% if not review.blocking_issues and not review.missing_documents and (not review.flagged_transactions_summary or review.flagged_transactions_summary.total_flagged == 0) %}
-                <div class="flex items-start text-sm">
-                    <span class="text-green-500 mr-2 font-bold">OK</span>
-                    <span class="text-gray-700"><strong>Ready for processing</strong> - All documents are in order</span>
-                </div>
-                {% endif %}
+
+                <!-- Report Issue (small) -->
+                <button onclick="reportDocumentIssue('{{ doc.id }}', '{{ doc.original_filename }}', '{{ doc.document_type }}')"
+                        class="flex-shrink-0 p-1.5 text-slate hover:text-accent hover:bg-rose-light rounded transition-colors"
+                        title="Report issue with this document">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </button>
             </div>
+            {% endfor %}
         </div>
     </div>
 
@@ -1176,7 +825,7 @@
         </div>
 
         <div class="flex space-x-3">
-            <button onclick="window.print()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            <button onclick="window.print()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
                 Print Report
             </button>
         </div>
@@ -1381,6 +1030,100 @@
     </div>
 </div>
 
+<!-- Transaction Processing Progress Modal -->
+<div x-show="processing" x-cloak
+     class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
+        <!-- Header -->
+        <div class="bg-primary px-6 py-4">
+            <h3 class="text-lg font-semibold text-white flex items-center">
+                <svg class="animate-spin mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing Transactions
+            </h3>
+        </div>
+
+        <!-- Progress Content -->
+        <div class="px-6 py-4">
+            <!-- Overall Progress Bar -->
+            <div class="mb-4">
+                <div class="flex justify-between text-sm text-gray-600 mb-1">
+                    <span>Overall Progress</span>
+                    <span x-text="Math.round(overallProgress) + '%'"></span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-accent h-2 rounded-full transition-all duration-500"
+                         :style="'width: ' + overallProgress + '%'"></div>
+                </div>
+            </div>
+
+            <!-- Current Stage -->
+            <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                <p class="text-sm font-medium text-gray-900" x-text="currentStage"></p>
+                <p class="text-xs text-gray-500 mt-1" x-text="currentStageDetail"></p>
+            </div>
+
+            <!-- Document List -->
+            <div class="space-y-2 max-h-48 overflow-y-auto">
+                <template x-for="(doc, index) in documentStatuses" :key="index">
+                    <div class="flex items-center justify-between p-2 rounded text-sm"
+                         :class="{
+                             'bg-green-50': doc.status === 'complete',
+                             'bg-blue-50': doc.status === 'processing',
+                             'bg-gray-50': doc.status === 'pending'
+                         }">
+                        <div class="flex items-center min-w-0 flex-1">
+                            <!-- Status Icon -->
+                            <span class="flex-shrink-0 mr-2">
+                                <template x-if="doc.status === 'complete'">
+                                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                </template>
+                                <template x-if="doc.status === 'processing'">
+                                    <svg class="w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                </template>
+                                <template x-if="doc.status === 'pending'">
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </template>
+                            </span>
+                            <!-- Document name -->
+                            <span class="truncate text-gray-700" x-text="doc.name"></span>
+                        </div>
+                        <!-- Status Text -->
+                        <span class="flex-shrink-0 ml-2 text-xs"
+                              :class="{
+                                  'text-green-600': doc.status === 'complete',
+                                  'text-blue-600': doc.status === 'processing',
+                                  'text-gray-400': doc.status === 'pending'
+                              }"
+                              x-text="doc.status === 'complete' ? 'Done' : doc.status === 'processing' ? 'Processing...' : 'Pending'">
+                        </span>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="bg-gray-50 px-6 py-4 flex items-center justify-between">
+            <p class="text-xs text-gray-500">
+                Please don't close this page while transactions are being processed.
+            </p>
+            <button type="button" @click="cancelProcessing()"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- Toast Notification -->
 <div id="toast" class="fixed bottom-4 right-4 hidden">
     <div class="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg">
@@ -1463,16 +1206,16 @@ function transactionProcessor() {
                 this.documentStatuses = [{ name: 'All documents', status: 'pending', count: 0 }];
             }
 
-            // Stage name mapping for display
+            // Stage name mapping for display - must match backend stages
             const stageNames = {
                 'initializing': 'Initializing',
-                'loading_documents': 'Loading documents',
-                'reading_transactions': 'Reading transactions',
-                'applying_feedback': 'Applying feedback',
-                'querying_rag': 'Querying RAG patterns',
-                'categorizing': 'Categorizing transactions',
-                'applying_tax_rules': 'Applying tax rules',
-                'generating_summaries': 'Generating summaries',
+                'loading_documents': 'Loading Documents',
+                'reading_transactions': 'Reading Transactions',
+                'applying_feedback': 'Applying Corrections',
+                'querying_rag': 'Matching Patterns',
+                'categorizing': 'Categorizing Transactions',
+                'applying_tax_rules': 'Applying Tax Rules',
+                'generating_summaries': 'Generating Summaries',
                 'finalizing': 'Finalizing',
                 'complete': 'Complete!',
                 'error': 'Error'

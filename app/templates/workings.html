@@ -3,6 +3,52 @@
 {% block title %}Tax Return Workings - Property Tax{% endblock %}
 
 {% block content %}
+<!-- Progress Stepper -->
+<div class="bg-white shadow rounded-lg p-4 mb-6">
+    <div class="flex items-center justify-between max-w-3xl mx-auto">
+        <!-- Step 1: Upload -->
+        <div class="flex items-center">
+            <div class="flex items-center justify-center w-10 h-10 rounded-full bg-green-500 text-white">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <span class="ml-2 text-sm font-medium text-gray-900">Upload</span>
+        </div>
+        <div class="flex-1 h-1 mx-4 bg-green-500"></div>
+
+        <!-- Step 2: Classification -->
+        <div class="flex items-center">
+            <div class="flex items-center justify-center w-10 h-10 rounded-full bg-green-500 text-white">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <span class="ml-2 text-sm font-medium text-gray-900">Classify</span>
+        </div>
+        <div class="flex-1 h-1 mx-4 bg-green-500"></div>
+
+        <!-- Step 3: Review -->
+        <div class="flex items-center">
+            <div class="flex items-center justify-center w-10 h-10 rounded-full bg-green-500 text-white">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <span class="ml-2 text-sm font-medium text-gray-900">Review</span>
+        </div>
+        <div class="flex-1 h-1 mx-4 bg-green-500"></div>
+
+        <!-- Step 4: Workings (Active) -->
+        <div class="flex items-center">
+            <div class="flex items-center justify-center w-10 h-10 rounded-full bg-accent text-white">
+                <span class="text-sm font-bold">4</span>
+            </div>
+            <span class="ml-2 text-sm font-medium text-accent">Workings</span>
+        </div>
+    </div>
+</div>
+
 <div class="w-full space-y-6" x-data="unifiedWorkings()">
     <!-- Header -->
     <div class="bg-white shadow rounded-lg p-6">
@@ -355,25 +401,6 @@
                                             </div>
                                             {% endif %}
 
-                                            <!-- Action Buttons -->
-                                            <div class="mt-3 pt-3 border-t border-blue-200 flex justify-end gap-2">
-                                                <button @click="confirmCalculation('income', '{{ key }}', '{{ item.display_name if item.display_name else key|replace('_', ' ')|title }}', {{ item.gross_amount|default(0) }}, $event)"
-                                                        :class="confirmedItems['income_{{ key }}'] ? 'bg-green-500 text-white cursor-default' : 'bg-green-100 text-green-700 hover:bg-green-200'"
-                                                        :disabled="confirmedItems['income_{{ key }}'] || confirmingItem === 'income_{{ key }}'"
-                                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-75">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                                    </svg>
-                                                    <span x-text="confirmedItems['income_{{ key }}'] ? 'Confirmed' : 'Confirm Correct'"></span>
-                                                </button>
-                                                <button @click="openFeedbackModal('income', '{{ key }}', '{{ item.display_name if item.display_name else key|replace('_', ' ')|title }}')"
-                                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
-                                                    </svg>
-                                                    Give Feedback
-                                                </button>
-                                            </div>
                                         </div>
                                     </details>
                                     {% endif %}
@@ -555,25 +582,6 @@
                                             </div>
                                             {% endif %}
 
-                                            <!-- Action Buttons -->
-                                            <div class="mt-3 pt-3 border-t border-red-200 flex justify-end gap-2">
-                                                <button @click="confirmCalculation('expense', '{{ key }}', '{{ item.display_name if item.display_name else key|replace('_', ' ')|title }}', {{ item.gross_amount|default(0) }}, $event)"
-                                                        :class="confirmedItems['expense_{{ key }}'] ? 'bg-green-500 text-white cursor-default' : 'bg-green-100 text-green-700 hover:bg-green-200'"
-                                                        :disabled="confirmedItems['expense_{{ key }}'] || confirmingItem === 'expense_{{ key }}'"
-                                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-75">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                                    </svg>
-                                                    <span x-text="confirmedItems['expense_{{ key }}'] ? 'Confirmed' : 'Confirm Correct'"></span>
-                                                </button>
-                                                <button @click="openFeedbackModal('expense', '{{ key }}', '{{ item.display_name if item.display_name else key|replace('_', ' ')|title }}')"
-                                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
-                                                    </svg>
-                                                    Give Feedback
-                                                </button>
-                                            </div>
                                         </div>
                                     </details>
                                     {% endif %}
@@ -961,79 +969,94 @@
 
 <!-- P&L Processing Progress Modal -->
 <div x-show="showProcessingModal" x-cloak
-     class="fixed inset-0 z-50 overflow-y-auto">
-    <div class="flex items-center justify-center min-h-screen px-4">
-        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+     class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
+        <!-- Header -->
+        <div class="bg-primary px-6 py-4">
+            <h3 class="text-lg font-semibold text-white flex items-center">
+                <svg class="animate-spin mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Generating P&L Workings
+            </h3>
+        </div>
 
-        <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <!-- Header -->
-            <div class="text-center mb-6">
-                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-accent/10 mb-4">
-                    <svg class="animate-spin h-6 w-6 text-accent" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+        <!-- Progress Content -->
+        <div class="px-6 py-4">
+            <!-- Overall Progress Bar -->
+            <div class="mb-4">
+                <div class="flex justify-between text-sm text-gray-600 mb-1">
+                    <span>Overall Progress</span>
+                    <span x-text="Math.round((processingSteps.findIndex(s => s.key === processingStage) + 1) / processingSteps.length * 100) + '%'"></span>
                 </div>
-                <h3 class="text-lg font-medium text-gray-900">Processing P&L Workings</h3>
-                <p class="mt-1 text-sm text-gray-500" x-text="processingMessage">Please wait...</p>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-accent h-2 rounded-full transition-all duration-500"
+                         :style="{ width: ((processingSteps.findIndex(s => s.key === processingStage) + 1) / processingSteps.length * 100) + '%' }"></div>
+                </div>
             </div>
 
-            <!-- Progress Steps -->
-            <div class="space-y-4">
+            <!-- Current Stage -->
+            <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                <p class="text-sm font-medium text-gray-900" x-text="processingSteps.find(s => s.key === processingStage)?.label || 'Initializing...'"></p>
+                <p class="text-xs text-gray-500 mt-1" x-text="processingMessage"></p>
+            </div>
+
+            <!-- Steps List -->
+            <div class="space-y-2">
                 <template x-for="(step, index) in processingSteps" :key="step.key">
-                    <div class="flex items-center">
-                        <!-- Step Icon -->
-                        <div class="flex-shrink-0">
-                            <div :class="{
-                                'bg-accent': processingSteps.findIndex(s => s.key === processingStage) > index,
-                                'bg-accent animate-pulse': processingStage === step.key,
-                                'bg-gray-200': processingSteps.findIndex(s => s.key === processingStage) < index
-                            }" class="w-8 h-8 rounded-full flex items-center justify-center">
-                                <!-- Completed checkmark -->
+                    <div class="flex items-center justify-between p-2 rounded text-sm"
+                         :class="{
+                             'bg-green-50': processingSteps.findIndex(s => s.key === processingStage) > index,
+                             'bg-blue-50': processingStage === step.key,
+                             'bg-gray-50': processingSteps.findIndex(s => s.key === processingStage) < index
+                         }">
+                        <div class="flex items-center min-w-0 flex-1">
+                            <!-- Status Icon -->
+                            <span class="flex-shrink-0 mr-2">
                                 <template x-if="processingSteps.findIndex(s => s.key === processingStage) > index">
-                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                                     </svg>
                                 </template>
-                                <!-- Current spinning icon -->
                                 <template x-if="processingStage === step.key">
-                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="step.icon"></path>
+                                    <svg class="w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
                                 </template>
-                                <!-- Pending dot -->
                                 <template x-if="processingSteps.findIndex(s => s.key === processingStage) < index">
-                                    <div class="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
                                 </template>
-                            </div>
+                            </span>
+                            <!-- Step name -->
+                            <span class="truncate text-gray-700" x-text="step.label"></span>
                         </div>
-                        <!-- Step Label -->
-                        <div class="ml-4 flex-1">
-                            <p :class="{
-                                'text-accent font-medium': processingSteps.findIndex(s => s.key === processingStage) >= index,
-                                'text-gray-400': processingSteps.findIndex(s => s.key === processingStage) < index
-                            }" class="text-sm" x-text="step.label"></p>
-                        </div>
+                        <!-- Status Text -->
+                        <span class="flex-shrink-0 ml-2 text-xs"
+                              :class="{
+                                  'text-green-600': processingSteps.findIndex(s => s.key === processingStage) > index,
+                                  'text-blue-600': processingStage === step.key,
+                                  'text-gray-400': processingSteps.findIndex(s => s.key === processingStage) < index
+                              }"
+                              x-text="processingSteps.findIndex(s => s.key === processingStage) > index ? 'Done' : processingStage === step.key ? 'Processing...' : 'Pending'">
+                        </span>
                     </div>
                 </template>
             </div>
+        </div>
 
-            <!-- Progress bar -->
-            <div class="mt-6">
-                <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="bg-accent h-2 rounded-full transition-all duration-500"
-                         :style="{ width: ((processingSteps.findIndex(s => s.key === processingStage) + 1) / processingSteps.length * 100) + '%' }">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Cancel Button -->
-            <div class="mt-6 text-center">
-                <button @click="cancelProcessing()"
-                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
-                    Cancel
-                </button>
-            </div>
+        <!-- Footer -->
+        <div class="bg-gray-50 px-6 py-4 flex items-center justify-between">
+            <p class="text-xs text-gray-500">
+                Please don't close this page while workings are being generated.
+            </p>
+            <button type="button" @click="cancelProcessing()"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent">
+                Cancel
+            </button>
         </div>
     </div>
 </div>
@@ -1111,10 +1134,10 @@ function unifiedWorkings() {
         processingMessage: '',
         processingAbortController: null,
         processingSteps: [
-            { key: 'extracting', label: 'Extracting Transactions', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
-            { key: 'categorizing', label: 'Categorizing Items', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z' },
-            { key: 'calculating', label: 'Calculating P&L', icon: 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
-            { key: 'finalizing', label: 'Finalizing Workings', icon: 'M5 13l4 4L19 7' }
+            { key: 'loading', label: 'Loading Documents' },
+            { key: 'categorizing', label: 'Categorizing Transactions' },
+            { key: 'calculating', label: 'Generating P&L with AI' },
+            { key: 'finalizing', label: 'Saving Workings' }
         ],
 
         taxReturnId: '{{ tax_return.id }}',
@@ -1194,17 +1217,18 @@ function unifiedWorkings() {
         async processWorkings() {
             this.processing = true;
             this.showProcessingModal = true;
-            this.processingStage = 'extracting';
-            this.processingMessage = 'Reading transactions from documents...';
+            this.processingStage = 'loading';
+            this.processingMessage = 'Reading documents and extracting transactions...';
 
             // Create AbortController for cancellation
             this.processingAbortController = new AbortController();
 
             try {
                 // Progress through stages while API processes
+                // Timing approximates actual backend processing
                 const progressStages = [
-                    { stage: 'categorizing', message: 'Applying categorization rules...', delay: 1200 },
-                    { stage: 'calculating', message: 'Computing P&L totals...', delay: 1500 },
+                    { stage: 'categorizing', message: 'Applying categorization rules and tax treatments...', delay: 2000 },
+                    { stage: 'calculating', message: 'Analyzing transactions and computing P&L totals...', delay: 3000 },
                 ];
 
                 // Start the API call with abort signal
@@ -1231,12 +1255,12 @@ function unifiedWorkings() {
 
                 // Move to finalizing stage
                 this.processingStage = 'finalizing';
-                this.processingMessage = 'Saving workings...';
+                this.processingMessage = 'Saving workings to database...';
                 await new Promise(resolve => setTimeout(resolve, 500));
 
                 if (response.ok) {
-                    this.processingMessage = 'Complete! Refreshing...';
-                    await new Promise(resolve => setTimeout(resolve, 300));
+                    this.processingMessage = 'Complete! Refreshing page...';
+                    await new Promise(resolve => setTimeout(resolve, 500));
                     window.location.reload();
                 } else {
                     const error = await response.json();

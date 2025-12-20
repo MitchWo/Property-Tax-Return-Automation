@@ -76,6 +76,40 @@ def _safe_abs(value, default=0):
         return default
 
 
+def _safe_decimal(value, default=Decimal("0")) -> Decimal:
+    """Safely convert a value to Decimal, handling invalid inputs.
+
+    Handles None, empty strings, non-numeric strings, and other edge cases
+    that Claude might return.
+    """
+    if value is None:
+        return default
+
+    # Convert to string first
+    str_val = str(value).strip()
+
+    # Handle empty strings
+    if not str_val:
+        return default
+
+    # Handle common non-numeric responses from Claude
+    if str_val.lower() in ('none', 'null', 'n/a', 'na', 'missing', 'unknown', '-'):
+        return default
+
+    try:
+        return Decimal(str_val)
+    except Exception:
+        # If conversion fails, try to extract a number
+        try:
+            # Remove currency symbols and commas
+            cleaned = str_val.replace('$', '').replace(',', '').strip()
+            if cleaned:
+                return Decimal(cleaned)
+        except Exception:
+            pass
+        return default
+
+
 def _sanitize_monthly_breakdown(breakdown):
     """Sanitize monthly_breakdown dict, converting non-numeric values to None.
 
@@ -285,7 +319,7 @@ class AIBrain:
             for key, item in income_workings.items():
                 if isinstance(item, dict) and item.get('gross_amount'):
                     try:
-                        total_income += Decimal(str(item['gross_amount']))
+                        total_income += _safe_decimal(item.get('gross_amount'))
                     except (ValueError, TypeError):
                         pass
 
@@ -294,7 +328,7 @@ class AIBrain:
                     amt = item.get('deductible_amount') or item.get('gross_amount')
                     if amt:
                         try:
-                            total_expenses += Decimal(str(amt))
+                            total_expenses += _safe_decimal(amt)
                         except (ValueError, TypeError):
                             pass
 
@@ -1657,7 +1691,7 @@ Return ONLY the JSON object, no other text.
                 category_code="rental_income",
                 display_name="Rental Income",
                 pl_row=ri.get("pl_row", 6),
-                gross_amount=Decimal(str(ri.get("amount", 0))),
+                gross_amount=_safe_decimal(ri.get("amount")),
                 deductible_percentage=0,  # Income, not deductible
                 deductible_amount=Decimal("0"),
                 source=ri.get("source", "Unknown"),
@@ -1673,7 +1707,7 @@ Return ONLY the JSON object, no other text.
                 category_code="water_rates_recovered",
                 display_name="Water Rates Recovered",
                 pl_row=wr.get("pl_row", 7),
-                gross_amount=Decimal(str(wr.get("amount", 0))),
+                gross_amount=_safe_decimal(wr.get("amount")),
                 deductible_percentage=0,
                 deductible_amount=Decimal("0"),
                 source=wr.get("source", "Unknown"),
@@ -1689,7 +1723,7 @@ Return ONLY the JSON object, no other text.
                 category_code="bank_contribution",
                 display_name="Bank Contribution",
                 pl_row=bc.get("pl_row", 8),
-                gross_amount=Decimal(str(bc.get("amount", 0))),
+                gross_amount=_safe_decimal(bc.get("amount")),
                 deductible_percentage=0,
                 deductible_amount=Decimal("0"),
                 source=bc.get("source", "Unknown"),
@@ -1705,7 +1739,7 @@ Return ONLY the JSON object, no other text.
                 category_code="other_income",
                 display_name="Other Income",
                 pl_row=oi.get("pl_row"),
-                gross_amount=Decimal(str(oi.get("amount", 0))),
+                gross_amount=_safe_decimal(oi.get("amount")),
                 deductible_percentage=0,
                 deductible_amount=Decimal("0"),
                 source=oi.get("source", "Unknown"),
@@ -1725,9 +1759,9 @@ Return ONLY the JSON object, no other text.
                 category_code="interest",
                 display_name="Mortgage Interest",
                 pl_row=int_data.get("pl_row", 25),
-                gross_amount=Decimal(str(_safe_abs(int_data.get("gross_amount")))),
+                gross_amount=_safe_decimal(_safe_abs(int_data.get("gross_amount"))),
                 deductible_percentage=float(int_data.get("deductible_percentage") or 100),
-                deductible_amount=Decimal(str(_safe_abs(int_data.get("deductible_amount")))),
+                deductible_amount=_safe_decimal(_safe_abs(int_data.get("deductible_amount"))),
                 source=int_data.get("source", "Unknown"),
                 source_code=int_data.get("source_code", "LS"),
                 verification_status=self._map_verification_status(int_data.get("verification", "unverified")),
@@ -1739,7 +1773,7 @@ Return ONLY the JSON object, no other text.
         # Rates
         if expenses_data.get("rates"):
             rates_data = expenses_data["rates"]
-            amount = Decimal(str(_safe_abs(rates_data.get("amount"))))
+            amount = _safe_decimal(_safe_abs(rates_data.get("amount")))
             workings.expenses.rates = LineItem(
                 category_code="rates",
                 display_name="Council Rates",
@@ -1757,7 +1791,7 @@ Return ONLY the JSON object, no other text.
         # Insurance
         if expenses_data.get("insurance"):
             ins_data = expenses_data["insurance"]
-            amount = Decimal(str(_safe_abs(ins_data.get("amount"))))
+            amount = _safe_decimal(_safe_abs(ins_data.get("amount")))
             workings.expenses.insurance = LineItem(
                 category_code="insurance",
                 display_name="Landlord Insurance",
@@ -1775,7 +1809,7 @@ Return ONLY the JSON object, no other text.
         # Agent fees
         if expenses_data.get("agent_fees"):
             af_data = expenses_data["agent_fees"]
-            amount = Decimal(str(_safe_abs(af_data.get("amount"))))
+            amount = _safe_decimal(_safe_abs(af_data.get("amount")))
             workings.expenses.agent_fees = LineItem(
                 category_code="agent_fees",
                 display_name="Property Management Fees",
@@ -1793,7 +1827,7 @@ Return ONLY the JSON object, no other text.
         # Water Rates
         if expenses_data.get("water_rates"):
             wr_data = expenses_data["water_rates"]
-            amount = Decimal(str(_safe_abs(wr_data.get("amount"))))
+            amount = _safe_decimal(_safe_abs(wr_data.get("amount")))
             workings.expenses.water_rates = LineItem(
                 category_code="water_rates",
                 display_name="Water Rates",
@@ -1811,7 +1845,7 @@ Return ONLY the JSON object, no other text.
         # Body Corporate
         if expenses_data.get("body_corporate"):
             bc_data = expenses_data["body_corporate"]
-            amount = Decimal(str(_safe_abs(bc_data.get("amount"))))
+            amount = _safe_decimal(_safe_abs(bc_data.get("amount")))
             workings.expenses.body_corporate = LineItem(
                 category_code="body_corporate",
                 display_name="Body Corporate",
@@ -1829,7 +1863,7 @@ Return ONLY the JSON object, no other text.
         # Legal Fees
         if expenses_data.get("legal_fees"):
             lf_data = expenses_data["legal_fees"]
-            amount = Decimal(str(_safe_abs(lf_data.get("amount"))))
+            amount = _safe_decimal(_safe_abs(lf_data.get("amount")))
             workings.expenses.legal_fees = LineItem(
                 category_code="legal_fees",
                 display_name="Legal Fees",
@@ -1847,7 +1881,7 @@ Return ONLY the JSON object, no other text.
         # Bank Fees
         if expenses_data.get("bank_fees"):
             bf_data = expenses_data["bank_fees"]
-            amount = Decimal(str(_safe_abs(bf_data.get("amount"))))
+            amount = _safe_decimal(_safe_abs(bf_data.get("amount")))
             workings.expenses.bank_fees = LineItem(
                 category_code="bank_fees",
                 display_name="Bank Fees",
@@ -1865,7 +1899,7 @@ Return ONLY the JSON object, no other text.
         # Advertising
         if expenses_data.get("advertising"):
             ad_data = expenses_data["advertising"]
-            amount = Decimal(str(_safe_abs(ad_data.get("amount"))))
+            amount = _safe_decimal(_safe_abs(ad_data.get("amount")))
             workings.expenses.advertising = LineItem(
                 category_code="advertising",
                 display_name="Advertising",
@@ -1883,7 +1917,7 @@ Return ONLY the JSON object, no other text.
         # Resident Society (separate from Body Corporate)
         if expenses_data.get("resident_society"):
             rs_data = expenses_data["resident_society"]
-            amount = Decimal(str(_safe_abs(rs_data.get("amount"))))
+            amount = _safe_decimal(_safe_abs(rs_data.get("amount")))
             workings.expenses.resident_society = LineItem(
                 category_code="resident_society",
                 display_name="Resident Society",
@@ -1901,7 +1935,7 @@ Return ONLY the JSON object, no other text.
         # Depreciation
         if expenses_data.get("depreciation"):
             dep_data = expenses_data["depreciation"]
-            amount = Decimal(str(_safe_abs(dep_data.get("amount"))))
+            amount = _safe_decimal(_safe_abs(dep_data.get("amount")))
             workings.expenses.depreciation = LineItem(
                 category_code="depreciation",
                 display_name="Depreciation",
@@ -1919,7 +1953,7 @@ Return ONLY the JSON object, no other text.
         # Accounting Fees (standard $862.50)
         if expenses_data.get("accounting_fees"):
             af_data = expenses_data["accounting_fees"]
-            amount = Decimal(str(_safe_abs(af_data.get("amount"), 862.50)))
+            amount = _safe_decimal(_safe_abs(af_data.get("amount"), 862.50))
             workings.expenses.accounting_fees = LineItem(
                 category_code="accounting_fees",
                 display_name="Consulting & Accounting",
@@ -1937,7 +1971,7 @@ Return ONLY the JSON object, no other text.
         # Due Diligence (LIM, meth test, healthy homes, etc.)
         if expenses_data.get("due_diligence"):
             dd_data = expenses_data["due_diligence"]
-            amount = Decimal(str(_safe_abs(dd_data.get("amount"))))
+            amount = _safe_decimal(_safe_abs(dd_data.get("amount")))
             workings.expenses.due_diligence = LineItem(
                 category_code="due_diligence",
                 display_name="Due Diligence",
@@ -1955,7 +1989,7 @@ Return ONLY the JSON object, no other text.
         # Other Expenses
         if expenses_data.get("other_expenses"):
             oe_data = expenses_data["other_expenses"]
-            amount = Decimal(str(_safe_abs(oe_data.get("amount"))))
+            amount = _safe_decimal(_safe_abs(oe_data.get("amount")))
             workings.expenses.other_expenses = LineItem(
                 category_code="other_expenses",
                 display_name="Other Expenses",
@@ -1985,12 +2019,12 @@ Return ONLY the JSON object, no other text.
                 items.append(RepairItem(
                     date=date_val,
                     description=item.get("description", ""),
-                    amount=Decimal(str(_safe_abs(item.get("amount")))),
+                    amount=_safe_decimal(_safe_abs(item.get("amount"))),
                     payee=item.get("payee"),
                     invoice_status=item.get("invoice_status", "not_required")
                 ))
 
-            total = Decimal(str(_safe_abs(rep_data.get("total_amount"))))
+            total = _safe_decimal(_safe_abs(rep_data.get("total_amount")))
             workings.expenses.repairs_maintenance = RepairsLineItem(
                 category_code="repairs_maintenance",
                 display_name="Repairs & Maintenance",
@@ -2029,7 +2063,7 @@ Return ONLY the JSON object, no other text.
                 question=q.get("question", ""),
                 context=q.get("context"),
                 options=q.get("options", []),
-                related_amount=Decimal(str(q.get("related_amount", 0))) if q.get("related_amount") else None
+                related_amount=_safe_decimal(q.get("related_amount")) if q.get("related_amount") else None
             ))
 
         # Parse documents status
@@ -2071,7 +2105,7 @@ Return ONLY the JSON object, no other text.
                 calculation_steps=calc_data.get("calculation_steps", []),
                 cross_validated_with=calc_data.get("cross_validated_with", []),
                 validation_status=calc_data.get("validation_status", "not_validated"),
-                variance_amount=Decimal(str(calc_data["variance_amount"])) if calc_data.get("variance_amount") else None,
+                variance_amount=_safe_decimal(calc_data.get("variance_amount")) if calc_data.get("variance_amount") else None,
                 variance_notes=calc_data.get("variance_notes"),
                 adjustments=calc_data.get("adjustments", []),
                 source_references=[]  # Could parse if provided
@@ -2411,17 +2445,17 @@ Respond with ONLY a JSON object:
                 if corrections.get("corrections"):
                     corr = corrections["corrections"]
                     if corr.get("total_income") is not None:
-                        workings.summary.total_income = Decimal(str(corr["total_income"]))
+                        workings.summary.total_income = _safe_decimal(corr["total_income"])
                         logger.info(f"QA corrected total_income to {corr['total_income']}")
                     if corr.get("total_deductions") is not None:
-                        workings.summary.total_deductions = Decimal(str(corr["total_deductions"]))
+                        workings.summary.total_deductions = _safe_decimal(corr["total_deductions"])
                         logger.info(f"QA corrected total_deductions to {corr['total_deductions']}")
                     if corr.get("net_rental_income") is not None:
-                        workings.summary.net_rental_income = Decimal(str(corr["net_rental_income"]))
+                        workings.summary.net_rental_income = _safe_decimal(corr["net_rental_income"])
                         logger.info(f"QA corrected net_rental_income to {corr['net_rental_income']}")
                     if corr.get("interest_deductible_amount") is not None and workings.expenses and workings.expenses.interest:
-                        workings.expenses.interest.deductible_amount = Decimal(str(corr["interest_deductible_amount"]))
-                        workings.summary.interest_deductible_amount = Decimal(str(corr["interest_deductible_amount"]))
+                        workings.expenses.interest.deductible_amount = _safe_decimal(corr["interest_deductible_amount"])
+                        workings.summary.interest_deductible_amount = _safe_decimal(corr["interest_deductible_amount"])
                         logger.info(f"QA corrected interest_deductible_amount to {corr['interest_deductible_amount']}")
 
                 # Add verification notes
