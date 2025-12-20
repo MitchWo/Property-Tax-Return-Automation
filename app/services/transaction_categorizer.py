@@ -1029,6 +1029,7 @@ IMPORTANT:
             text("DELETE FROM transaction_summaries WHERE tax_return_id = :id"),
             {"id": tax_return_id}
         )
+        await db.flush()  # Ensure delete is executed before inserts
 
         # Aggregate by category
         query = text("""

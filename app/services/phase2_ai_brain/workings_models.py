@@ -55,6 +55,7 @@ class FlagCategory(str, Enum):
     DATA_QUALITY = "data_quality"
     COMPLIANCE = "compliance"
     CAPITAL_TREATMENT = "capital_treatment"  # For items that should be capital, not deductible
+    ADDRESS_MISMATCH = "address_mismatch"  # Property address doesn't match across documents
 
 
 class SourceCode(str, Enum):

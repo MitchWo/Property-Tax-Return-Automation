@@ -771,6 +771,7 @@ class TransactionProcessor:
                     TransactionSummary.tax_return_id == tax_return_id
                 )
             )
+            await db.flush()  # Ensure delete is executed before inserts
 
             # Create new summaries per category
             summaries = []
