@@ -1224,13 +1224,6 @@ function unifiedWorkings() {
             this.processingAbortController = new AbortController();
 
             try {
-                // Progress through stages while API processes
-                // Timing approximates actual backend processing
-                const progressStages = [
-                    { stage: 'categorizing', message: 'Applying categorization rules and tax treatments...', delay: 2000 },
-                    { stage: 'calculating', message: 'Analyzing transactions and computing P&L totals...', delay: 3000 },
-                ];
-
                 // Start the API call with abort signal
                 const fetchPromise = fetch('/api/workings/{{ tax_return.id }}/process', {
                     method: 'POST',
@@ -1243,15 +1236,41 @@ function unifiedWorkings() {
                 });
 
                 // Progress through stages while waiting for API
-                for (const { stage, message, delay } of progressStages) {
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    if (this.processingAbortController.signal.aborted) return;
-                    this.processingStage = stage;
-                    this.processingMessage = message;
-                }
+                // These continue to cycle while waiting for the long-running API
+                const progressStages = [
+                    { stage: 'categorizing', message: 'Applying categorization rules and tax treatments...', delay: 3000 },
+                    { stage: 'calculating', message: 'AI is analyzing transactions and computing P&L totals...', delay: 5000 },
+                    { stage: 'calculating', message: 'This may take several minutes for complex returns...', delay: 10000 },
+                    { stage: 'calculating', message: 'Still processing... AI is reviewing all documents...', delay: 15000 },
+                ];
+
+                // Run progress animation in parallel with API call
+                let stageIndex = 0;
+                let progressComplete = false;
+
+                const progressLoop = async () => {
+                    for (const { stage, message, delay } of progressStages) {
+                        if (this.processingAbortController.signal.aborted || progressComplete) return;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        if (this.processingAbortController.signal.aborted || progressComplete) return;
+                        this.processingStage = stage;
+                        this.processingMessage = message;
+                    }
+                    // Keep showing "still processing" message if API takes longer
+                    while (!progressComplete && !this.processingAbortController.signal.aborted) {
+                        await new Promise(resolve => setTimeout(resolve, 20000));
+                        if (!progressComplete) {
+                            this.processingMessage = 'Still processing... Please wait, this can take up to 10 minutes...';
+                        }
+                    }
+                };
+
+                // Start progress animation (don't await - run in parallel)
+                progressLoop();
 
                 // Wait for API response
                 const response = await fetchPromise;
+                progressComplete = true;
 
                 // Move to finalizing stage
                 this.processingStage = 'finalizing';
