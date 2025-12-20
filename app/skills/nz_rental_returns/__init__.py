@@ -1,0 +1,1 @@
+"""NZ Rental Returns skill package."""

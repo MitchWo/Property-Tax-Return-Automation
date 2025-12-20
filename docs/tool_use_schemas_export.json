@@ -1,0 +1,2338 @@
+{
+  "DOCUMENT_CLASSIFICATION_TOOL": {
+    "name": "classify_document",
+    "description": "Classify a document and extract key identifiers for NZ rental property tax returns",
+    "input_schema": {
+      "type": "object",
+      "required": [
+        "document_type",
+        "confidence",
+        "reasoning",
+        "address_verification",
+        "key_identifiers"
+      ],
+      "properties": {
+        "document_type": {
+          "type": "string",
+          "enum": [
+            "bank_statement",
+            "loan_statement",
+            "settlement_statement",
+            "depreciation_schedule",
+            "body_corporate",
+            "property_manager_statement",
+            "lim_report",
+            "healthy_homes",
+            "meth_test",
+            "smoke_alarm",
+            "ccc",
+            "landlord_insurance",
+            "rates",
+            "water_rates",
+            "maintenance_invoice",
+            "resident_society",
+            "personal_expense_claims",
+            "other",
+            "invalid"
+          ],
+          "description": "Type of document identified"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence score for classification (0.0 to 1.0)"
+        },
+        "reasoning": {
+          "type": "string",
+          "description": "Brief explanation for the classification decision"
+        },
+        "address_verification": {
+          "type": "object",
+          "required": [
+            "address_found",
+            "matches_context"
+          ],
+          "properties": {
+            "address_found": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Property address found in document, or null if not found"
+            },
+            "matches_context": {
+              "type": "boolean",
+              "description": "Whether address matches the property context provided"
+            },
+            "mismatch_details": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Details if address doesn't match"
+            }
+          }
+        },
+        "key_identifiers": {
+          "type": "object",
+          "description": "Key fields extracted from document",
+          "properties": {
+            "document_date": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "period_start": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "period_end": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "issuer_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "account_number": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "total_amount": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "flag_code": {
+                "type": "string",
+                "enum": [
+                  "address_mismatch",
+                  "wrong_insurance_type",
+                  "personal_document",
+                  "date_outside_tax_year",
+                  "incomplete_document",
+                  "missing_required_fields",
+                  "potential_duplicate",
+                  "requires_verification"
+                ]
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "critical",
+                  "warning",
+                  "info"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "Any issues or flags detected"
+        },
+        "property_management_detection": {
+          "type": "object",
+          "properties": {
+            "detected_type": {
+              "type": "string",
+              "enum": [
+                "long_term",
+                "short_term",
+                "self_managed",
+                "unknown"
+              ]
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "indicators": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "BANK_STATEMENT_EXTRACTION_TOOL": {
+    "name": "extract_bank_statement",
+    "description": "Extract ALL transactions from a bank statement for NZ rental property tax",
+    "input_schema": {
+      "type": "object",
+      "required": [
+        "account_info",
+        "statement_period",
+        "transactions",
+        "summary"
+      ],
+      "properties": {
+        "account_info": {
+          "type": "object",
+          "required": [
+            "bank_name",
+            "account_number"
+          ],
+          "properties": {
+            "bank_name": {
+              "type": "string"
+            },
+            "account_number": {
+              "type": "string"
+            },
+            "account_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "account_type": {
+              "type": "string",
+              "enum": [
+                "transaction",
+                "savings",
+                "loan",
+                "revolving_credit",
+                "offset",
+                "other"
+              ]
+            },
+            "is_joint_account": {
+              "type": "boolean"
+            },
+            "is_rental_dedicated": {
+              "type": "boolean"
+            }
+          }
+        },
+        "statement_period": {
+          "type": "object",
+          "required": [
+            "start_date",
+            "end_date",
+            "opening_balance",
+            "closing_balance"
+          ],
+          "properties": {
+            "start_date": {
+              "type": "string",
+              "format": "date"
+            },
+            "end_date": {
+              "type": "string",
+              "format": "date"
+            },
+            "opening_balance": {
+              "type": "number"
+            },
+            "closing_balance": {
+              "type": "number"
+            },
+            "tax_year": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "transactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "date",
+              "description",
+              "amount",
+              "transaction_type",
+              "categorization"
+            ],
+            "properties": {
+              "date": {
+                "type": "string",
+                "format": "date"
+              },
+              "description": {
+                "type": "string"
+              },
+              "reference": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "amount": {
+                "type": "number"
+              },
+              "balance": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "transaction_type": {
+                "type": "string",
+                "enum": [
+                  "credit",
+                  "debit"
+                ]
+              },
+              "categorization": {
+                "type": "object",
+                "required": [
+                  "suggested_category",
+                  "confidence"
+                ],
+                "properties": {
+                  "suggested_category": {
+                    "type": "string",
+                    "enum": [
+                      "rental_income",
+                      "water_rates_recovered",
+                      "bank_contribution",
+                      "other_income",
+                      "interest_debit",
+                      "interest_credit",
+                      "principal_repayment",
+                      "council_rates",
+                      "water_rates",
+                      "body_corporate_operating",
+                      "body_corporate_reserve",
+                      "resident_society",
+                      "landlord_insurance",
+                      "agent_fees",
+                      "letting_fee",
+                      "advertising",
+                      "repairs_maintenance",
+                      "accounting_fees",
+                      "legal_fees",
+                      "due_diligence",
+                      "transfer_between_accounts",
+                      "personal_expense",
+                      "bond_received",
+                      "bond_released",
+                      "loan_drawdown",
+                      "loan_repayment",
+                      "drawing",
+                      "funds_introduced",
+                      "short_term_rental_income",
+                      "travel_agent_commission",
+                      "daily_service_fee",
+                      "platform_fees",
+                      "unknown"
+                    ]
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "pl_row": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "is_deductible": {
+                    "type": "boolean"
+                  },
+                  "exclude_from_pl": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "special_handling": {
+                "type": "object",
+                "properties": {
+                  "is_combined_bond_rent": {
+                    "type": "boolean"
+                  },
+                  "suggested_bond_amount": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suggested_rent_amount": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "is_loan_repayment_total": {
+                    "type": "boolean"
+                  },
+                  "linked_loan_account": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "is_offset_related": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "review_flags": {
+                "type": "object",
+                "properties": {
+                  "needs_review": {
+                    "type": "boolean"
+                  },
+                  "reasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": [
+                      "critical",
+                      "warning",
+                      "info"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "interest_analysis": {
+          "type": "object",
+          "properties": {
+            "total_interest_debits": {
+              "type": "number",
+              "description": "Sum of ALL interest DEBIT transactions (gross)"
+            },
+            "total_interest_credits": {
+              "type": "number",
+              "description": "Sum of interest credits (DO NOT subtract from debits)"
+            },
+            "interest_frequency": {
+              "type": "string",
+              "enum": [
+                "weekly",
+                "fortnightly",
+                "monthly",
+                "irregular"
+              ]
+            },
+            "interest_transaction_count": {
+              "type": "integer"
+            },
+            "offset_account_detected": {
+              "type": "boolean"
+            },
+            "offset_notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "monthly_breakdown": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "summary": {
+          "type": "object",
+          "required": [
+            "total_transactions",
+            "total_credits",
+            "total_debits"
+          ],
+          "properties": {
+            "total_transactions": {
+              "type": "integer"
+            },
+            "total_credits": {
+              "type": "number"
+            },
+            "total_debits": {
+              "type": "number"
+            },
+            "net_movement": {
+              "type": "number"
+            },
+            "balance_validated": {
+              "type": "boolean"
+            },
+            "balance_variance": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "flagged_count": {
+              "type": "integer"
+            }
+          }
+        },
+        "extraction_metadata": {
+          "type": "object",
+          "properties": {
+            "pages_processed": {
+              "type": "integer"
+            },
+            "batch_number": {
+              "type": "integer"
+            },
+            "total_batches": {
+              "type": "integer"
+            },
+            "is_continuation": {
+              "type": "boolean"
+            },
+            "is_complete": {
+              "type": "boolean"
+            },
+            "data_quality_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  "LOAN_STATEMENT_EXTRACTION_TOOL": {
+    "name": "extract_loan_statement",
+    "description": "Extract loan/mortgage statement with interest and principal breakdown for NZ rental property",
+    "input_schema": {
+      "type": "object",
+      "required": [
+        "loan_info",
+        "statement_period",
+        "interest_summary",
+        "transactions"
+      ],
+      "properties": {
+        "loan_info": {
+          "type": "object",
+          "required": [
+            "lender",
+            "account_number"
+          ],
+          "properties": {
+            "lender": {
+              "type": "string"
+            },
+            "account_number": {
+              "type": "string"
+            },
+            "loan_type": {
+              "type": "string",
+              "enum": [
+                "table_loan",
+                "revolving_credit",
+                "interest_only",
+                "offset",
+                "fixed",
+                "floating"
+              ]
+            },
+            "original_amount": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "current_balance": {
+              "type": "number"
+            },
+            "interest_rate": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "rate_type": {
+              "type": "string",
+              "enum": [
+                "fixed",
+                "floating",
+                "mixed"
+              ]
+            },
+            "property_secured": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "statement_period": {
+          "type": "object",
+          "required": [
+            "start_date",
+            "end_date"
+          ],
+          "properties": {
+            "start_date": {
+              "type": "string",
+              "format": "date"
+            },
+            "end_date": {
+              "type": "string",
+              "format": "date"
+            },
+            "opening_balance": {
+              "type": "number"
+            },
+            "closing_balance": {
+              "type": "number"
+            }
+          }
+        },
+        "interest_summary": {
+          "type": "object",
+          "required": [
+            "total_interest_charged"
+          ],
+          "properties": {
+            "total_interest_charged": {
+              "type": "number",
+              "description": "GROSS interest debits - do NOT subtract credits"
+            },
+            "interest_credits": {
+              "type": "number",
+              "description": "Track separately - DO NOT net off"
+            },
+            "average_daily_rate": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "interest_frequency": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly",
+                "fortnightly",
+                "monthly"
+              ]
+            },
+            "monthly_breakdown": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "principal_summary": {
+          "type": "object",
+          "properties": {
+            "total_principal_paid": {
+              "type": "number"
+            },
+            "principal_frequency": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "is_interest_only": {
+              "type": "boolean"
+            }
+          }
+        },
+        "transactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "date",
+              "description",
+              "amount",
+              "transaction_type"
+            ],
+            "properties": {
+              "date": {
+                "type": "string",
+                "format": "date"
+              },
+              "description": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "number"
+              },
+              "balance": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "transaction_type": {
+                "type": "string",
+                "enum": [
+                  "interest_debit",
+                  "interest_credit",
+                  "principal",
+                  "fee",
+                  "drawdown",
+                  "repayment",
+                  "other"
+                ]
+              }
+            }
+          }
+        },
+        "offset_account": {
+          "type": "object",
+          "properties": {
+            "is_offset": {
+              "type": "boolean"
+            },
+            "offset_balance": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "interest_saved": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "tax_treatment": {
+          "type": "object",
+          "required": [
+            "gross_interest_deductible"
+          ],
+          "properties": {
+            "gross_interest_deductible": {
+              "type": "number",
+              "description": "Total interest debits before deductibility %"
+            },
+            "deductibility_percentage": {
+              "type": "number",
+              "description": "80% for existing, 100% for new builds"
+            },
+            "net_deductible_interest": {
+              "type": "number"
+            },
+            "pl_row": {
+              "type": "integer",
+              "default": 25
+            },
+            "principal_excluded": {
+              "type": "number",
+              "description": "Principal is NOT deductible"
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "extraction_metadata": {
+          "type": "object",
+          "properties": {
+            "pages_processed": {
+              "type": "integer"
+            },
+            "data_quality_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  "SETTLEMENT_STATEMENT_EXTRACTION_TOOL": {
+    "name": "extract_settlement_statement",
+    "description": "Extract settlement statement data for Year 1 NZ rental property tax calculations",
+    "input_schema": {
+      "type": "object",
+      "required": [
+        "settlement_info",
+        "financial_details",
+        "fees_and_costs",
+        "year1_tax_calculations"
+      ],
+      "properties": {
+        "settlement_info": {
+          "type": "object",
+          "required": [
+            "settlement_date",
+            "property_address"
+          ],
+          "properties": {
+            "settlement_date": {
+              "type": "string",
+              "format": "date"
+            },
+            "property_address": {
+              "type": "string"
+            },
+            "contract_date": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "vendor_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "purchaser_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "solicitor_firm": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "financial_details": {
+          "type": "object",
+          "required": [
+            "purchase_price"
+          ],
+          "properties": {
+            "purchase_price": {
+              "type": "number"
+            },
+            "deposit_amount": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "balance_due_on_settlement": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        "apportionments": {
+          "type": "object",
+          "properties": {
+            "rates": {
+              "type": "object",
+              "properties": {
+                "settlement_apportionment": {
+                  "type": "number"
+                },
+                "vendor_instalment": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "vendor_credit": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "vendor_credit",
+                    "purchaser_credit"
+                  ]
+                },
+                "calculation_method": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "water_rates": {
+              "type": "object",
+              "properties": {
+                "adjustment_amount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "vendor_credit",
+                    "purchaser_credit"
+                  ]
+                }
+              }
+            },
+            "body_corporate": {
+              "type": "object",
+              "properties": {
+                "adjustment_amount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "operating_portion": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "reserve_portion": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "resident_society": {
+              "type": "object",
+              "properties": {
+                "adjustment_amount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "insurance": {
+              "type": "object",
+              "properties": {
+                "adjustment_amount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "policy_transferred": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "fees_and_costs": {
+          "type": "object",
+          "properties": {
+            "legal_fees": {
+              "type": "object",
+              "properties": {
+                "professional_fee": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "disbursements": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "gst": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "total": {
+                  "type": "number"
+                }
+              }
+            },
+            "agent_commission": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "registration_fees": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "other_fees": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "interest_on_deposit": {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "days": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "rate": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        "bank_contribution": {
+          "type": "object",
+          "properties": {
+            "mentioned_in_settlement": {
+              "type": "boolean"
+            },
+            "amount": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "lender_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "verification_required": {
+              "type": "boolean"
+            }
+          }
+        },
+        "year1_tax_calculations": {
+          "type": "object",
+          "required": [
+            "rates_deductible",
+            "legal_fees_deductible"
+          ],
+          "properties": {
+            "rates_deductible": {
+              "type": "object",
+              "properties": {
+                "settlement_apportionment": {
+                  "type": "number"
+                },
+                "vendor_instalment": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "vendor_credit": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "total_from_settlement": {
+                  "type": "number"
+                },
+                "calculation_formula": {
+                  "type": "string"
+                }
+              },
+              "description": "Year 1 Rates = Settlement apportionment + Vendor instalment - Vendor credit"
+            },
+            "legal_fees_deductible": {
+              "type": "object",
+              "properties": {
+                "total_legal_fees": {
+                  "type": "number"
+                },
+                "is_under_10k_threshold": {
+                  "type": "boolean"
+                },
+                "deductible_amount": {
+                  "type": "number"
+                }
+              },
+              "description": "Legal fees <$10k fully deductible, >=10k is capital"
+            },
+            "interest_on_deposit_treatment": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "treatment": {
+                  "type": "string"
+                }
+              },
+              "description": "Interest on deposit nets against Year 1 interest expense"
+            }
+          }
+        },
+        "all_line_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "line_number": {
+                "type": "integer"
+              },
+              "description": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "number"
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "debit",
+                  "credit"
+                ]
+              },
+              "is_deductible": {
+                "type": "boolean"
+              },
+              "category": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "description": "Every line item in document order for traceability"
+        },
+        "extraction_metadata": {
+          "type": "object",
+          "properties": {
+            "pages_processed": {
+              "type": "integer"
+            },
+            "is_complete": {
+              "type": "boolean"
+            },
+            "data_quality_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  "PROPERTY_MANAGER_STATEMENT_EXTRACTION_TOOL": {
+    "name": "extract_property_manager_statement",
+    "description": "Extract property manager statement with rent collected, fees, and expenses for NZ rental property",
+    "input_schema": {
+      "type": "object",
+      "required": [
+        "manager_info",
+        "statement_period",
+        "income",
+        "expenses",
+        "summary"
+      ],
+      "properties": {
+        "manager_info": {
+          "type": "object",
+          "required": [
+            "company_name"
+          ],
+          "properties": {
+            "company_name": {
+              "type": "string"
+            },
+            "gst_number": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "property_address": {
+              "type": "string"
+            },
+            "owner_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "statement_period": {
+          "type": "object",
+          "required": [
+            "start_date",
+            "end_date"
+          ],
+          "properties": {
+            "start_date": {
+              "type": "string",
+              "format": "date"
+            },
+            "end_date": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        },
+        "income": {
+          "type": "object",
+          "required": [
+            "gross_rent"
+          ],
+          "properties": {
+            "gross_rent": {
+              "type": "number"
+            },
+            "other_income": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "number"
+                  }
+                }
+              }
+            },
+            "total_income": {
+              "type": "number"
+            }
+          }
+        },
+        "expenses": {
+          "type": "object",
+          "properties": {
+            "management_fee": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "number"
+                },
+                "gst_inclusive": {
+                  "type": "boolean"
+                },
+                "percentage": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "letting_fee": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "advertising": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "repairs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "number"
+                  },
+                  "vendor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "other_expenses": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "number"
+                  },
+                  "category": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "total_expenses": {
+              "type": "number"
+            }
+          }
+        },
+        "disbursements": {
+          "type": "object",
+          "properties": {
+            "owner_payments": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "amount": {
+                    "type": "number"
+                  },
+                  "reference": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "total_disbursed": {
+              "type": "number"
+            }
+          }
+        },
+        "summary": {
+          "type": "object",
+          "required": [
+            "opening_balance",
+            "closing_balance"
+          ],
+          "properties": {
+            "opening_balance": {
+              "type": "number"
+            },
+            "total_income": {
+              "type": "number"
+            },
+            "total_expenses": {
+              "type": "number"
+            },
+            "total_disbursed": {
+              "type": "number"
+            },
+            "closing_balance": {
+              "type": "number"
+            }
+          }
+        },
+        "tax_treatment": {
+          "type": "object",
+          "properties": {
+            "rental_income_row_6": {
+              "type": "number"
+            },
+            "agent_fees_row_13": {
+              "type": "number"
+            },
+            "letting_fee_row_13": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "advertising_row_12": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "repairs_row_35": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "extraction_metadata": {
+          "type": "object",
+          "properties": {
+            "pages_processed": {
+              "type": "integer"
+            },
+            "batch_number": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "total_batches": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "data_quality_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  "BODY_CORPORATE_EXTRACTION_TOOL": {
+    "name": "extract_body_corporate",
+    "description": "Extract body corporate levy details with operating/reserve fund split for NZ tax",
+    "input_schema": {
+      "type": "object",
+      "required": [
+        "body_corporate_info",
+        "levy_details",
+        "tax_treatment"
+      ],
+      "properties": {
+        "body_corporate_info": {
+          "type": "object",
+          "required": [
+            "bc_name"
+          ],
+          "properties": {
+            "bc_name": {
+              "type": "string"
+            },
+            "unit_number": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "unit_entitlement": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "property_address": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "levy_period": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "period_start": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            },
+            "period_end": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            }
+          }
+        },
+        "levy_details": {
+          "type": "object",
+          "required": [
+            "total_levy"
+          ],
+          "properties": {
+            "total_levy": {
+              "type": "number"
+            },
+            "operating_fund": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "number"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "description": "DEDUCTIBLE - day-to-day building expenses"
+            },
+            "reserve_fund": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "number"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "description": "NOT DEDUCTIBLE - capital contributions"
+            },
+            "special_levy": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "purpose": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "is_capital": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "insurance_component": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "management_fee": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "other_components": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "number"
+                  },
+                  "is_deductible": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tax_treatment": {
+          "type": "object",
+          "required": [
+            "deductible_total",
+            "non_deductible_total"
+          ],
+          "properties": {
+            "deductible_total": {
+              "type": "number",
+              "description": "Operating fund + deductible components (Row 15)"
+            },
+            "non_deductible_total": {
+              "type": "number",
+              "description": "Reserve fund + capital contributions (EXCLUDED)"
+            },
+            "operating_pl_row": {
+              "type": "integer",
+              "default": 15
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "split_method": {
+              "type": "string",
+              "enum": [
+                "explicit_breakdown",
+                "percentage_estimate",
+                "full_deductible",
+                "requires_clarification"
+              ]
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "flag_code": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "critical",
+                  "warning",
+                  "info"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "DEPRECIATION_SCHEDULE_EXTRACTION_TOOL": {
+    "name": "extract_depreciation_schedule",
+    "description": "Extract depreciation schedule with asset values and annual depreciation for NZ rental property",
+    "input_schema": {
+      "type": "object",
+      "required": [
+        "property_info",
+        "valuation_summary",
+        "assets"
+      ],
+      "properties": {
+        "property_info": {
+          "type": "object",
+          "required": [
+            "property_address"
+          ],
+          "properties": {
+            "property_address": {
+              "type": "string"
+            },
+            "valuation_date": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            },
+            "valuation_provider": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "report_number": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "property_type": {
+              "type": "string",
+              "enum": [
+                "residential",
+                "commercial",
+                "mixed",
+                "new_build"
+              ]
+            },
+            "year_built": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "purchase_date": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            },
+            "purchase_price": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        "valuation_summary": {
+          "type": "object",
+          "required": [
+            "total_depreciable_value",
+            "annual_depreciation"
+          ],
+          "properties": {
+            "land_value": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "building_value": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "total_depreciable_value": {
+              "type": "number"
+            },
+            "annual_depreciation": {
+              "type": "number"
+            },
+            "depreciation_method": {
+              "type": "string",
+              "enum": [
+                "diminishing_value",
+                "straight_line"
+              ]
+            },
+            "chattels_value": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "chattels_depreciation": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        "assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "asset_name",
+              "value",
+              "rate",
+              "annual_depreciation"
+            ],
+            "properties": {
+              "asset_name": {
+                "type": "string"
+              },
+              "asset_category": {
+                "type": "string",
+                "enum": [
+                  "building",
+                  "fit_out",
+                  "plant_equipment",
+                  "furniture",
+                  "appliances",
+                  "other"
+                ]
+              },
+              "value": {
+                "type": "number"
+              },
+              "rate": {
+                "type": "number",
+                "description": "Depreciation rate as percentage"
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "DV",
+                  "SL"
+                ]
+              },
+              "annual_depreciation": {
+                "type": "number"
+              },
+              "useful_life_years": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "year1_adjustments": {
+          "type": "object",
+          "properties": {
+            "is_partial_year": {
+              "type": "boolean"
+            },
+            "ownership_start_date": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            },
+            "days_owned": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "pro_rata_factor": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "adjusted_depreciation": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "description": "Pro-rata depreciation for partial year of ownership"
+        },
+        "tax_treatment": {
+          "type": "object",
+          "required": [
+            "deductible_depreciation",
+            "pl_row"
+          ],
+          "properties": {
+            "deductible_depreciation": {
+              "type": "number"
+            },
+            "pl_row": {
+              "type": "integer",
+              "default": 17
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  "EXPENSE_DOCUMENT_EXTRACTION_TOOL": {
+    "name": "extract_expense_document",
+    "description": "Extract expense/invoice details for NZ rental property tax deductions",
+    "input_schema": {
+      "type": "object",
+      "required": [
+        "document_info",
+        "expense_details",
+        "tax_treatment"
+      ],
+      "properties": {
+        "document_info": {
+          "type": "object",
+          "required": [
+            "issuer",
+            "document_date"
+          ],
+          "properties": {
+            "issuer": {
+              "type": "string",
+              "description": "Company/council issuing the document"
+            },
+            "document_date": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            },
+            "document_number": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "period_start": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            },
+            "period_end": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            },
+            "property_address": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "expense_details": {
+          "type": "object",
+          "required": [
+            "total_amount",
+            "gst_inclusive"
+          ],
+          "properties": {
+            "total_amount": {
+              "type": "number"
+            },
+            "gst_inclusive": {
+              "type": "boolean"
+            },
+            "gst_amount": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "net_amount": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "line_items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "number"
+                  },
+                  "is_deductible": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            },
+            "payment_status": {
+              "type": "string",
+              "enum": [
+                "paid",
+                "unpaid",
+                "partial",
+                "unknown"
+              ]
+            },
+            "payment_date": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            },
+            "payment_method": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "tax_treatment": {
+          "type": "object",
+          "required": [
+            "suggested_category",
+            "is_deductible",
+            "pl_row"
+          ],
+          "properties": {
+            "suggested_category": {
+              "type": "string",
+              "enum": [
+                "council_rates",
+                "water_rates",
+                "landlord_insurance",
+                "repairs_maintenance",
+                "body_corporate_operating",
+                "body_corporate_reserve",
+                "resident_society",
+                "agent_fees",
+                "legal_fees",
+                "accounting_fees",
+                "advertising",
+                "other_property_costs",
+                "personal_expense"
+              ]
+            },
+            "is_deductible": {
+              "type": "boolean"
+            },
+            "pl_row": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "deductible_amount": {
+              "type": "number"
+            },
+            "non_deductible_amount": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "non_deductible_reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "flag_code": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "critical",
+                  "warning",
+                  "info"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "extraction_metadata": {
+          "type": "object",
+          "properties": {
+            "data_quality_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "pages_processed": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  },
+  "PL_ROW_MAPPING": {
+    "rental_income": {
+      "row": 6,
+      "type": "income",
+      "description": "Rent received"
+    },
+    "other_rental_income": {
+      "row": 7,
+      "type": "income",
+      "description": "Other rental income"
+    },
+    "bank_contribution": {
+      "row": 8,
+      "type": "income",
+      "description": "Bank cashback/contribution - TAXABLE"
+    },
+    "water_rates_recovered": {
+      "row": 9,
+      "type": "income",
+      "description": "Water recovered from tenant"
+    },
+    "insurance_recovered": {
+      "row": 10,
+      "type": "income",
+      "description": "Insurance payouts"
+    },
+    "short_term_rental_income": {
+      "row": 6,
+      "type": "income",
+      "description": "Airbnb/short-term rent"
+    },
+    "advertising": {
+      "row": 12,
+      "type": "expense",
+      "description": "Tenant-finding ads ONLY (separate from agent fees)"
+    },
+    "agent_fees": {
+      "row": 13,
+      "type": "expense",
+      "description": "Property management fees (GST inclusive)"
+    },
+    "letting_fee": {
+      "row": 13,
+      "type": "expense",
+      "description": "Tenant finding fee"
+    },
+    "platform_fees": {
+      "row": 13,
+      "type": "expense",
+      "description": "Airbnb/Bookabach platform fees"
+    },
+    "travel_agent_commission": {
+      "row": 13,
+      "type": "expense",
+      "description": "NO GST - don't divide by 1.15"
+    },
+    "body_corporate_operating": {
+      "row": 15,
+      "type": "expense",
+      "description": "Operating fund ONLY (not reserve)"
+    },
+    "accounting_fees": {
+      "row": 16,
+      "type": "expense",
+      "description": "Always include - standard $862.50"
+    },
+    "depreciation": {
+      "row": 17,
+      "type": "expense",
+      "description": "Pro-rate for partial year"
+    },
+    "due_diligence": {
+      "row": 18,
+      "type": "expense",
+      "description": "LIM, meth test, healthy homes, Valocity, Valuit"
+    },
+    "landlord_insurance": {
+      "row": 24,
+      "type": "expense",
+      "description": "Landlord/rental insurance ONLY"
+    },
+    "interest_debit": {
+      "row": 25,
+      "type": "expense",
+      "description": "After deductibility % applied"
+    },
+    "interest_expense": {
+      "row": 25,
+      "type": "expense",
+      "description": "Alias for interest_debit"
+    },
+    "legal_fees": {
+      "row": 27,
+      "type": "expense",
+      "description": "Deductible if <$10k (Year 1)"
+    },
+    "council_rates": {
+      "row": 34,
+      "type": "expense",
+      "description": "Year 1: Settlement + Instalments - Vendor credit"
+    },
+    "repairs_maintenance": {
+      "row": 35,
+      "type": "expense",
+      "description": "Repairs and maintenance"
+    },
+    "daily_service_fee": {
+      "row": 35,
+      "type": "expense",
+      "description": "Daily cleaning/service (short-term)"
+    },
+    "resident_society": {
+      "row": 36,
+      "type": "expense",
+      "description": "SEPARATE from Body Corporate"
+    },
+    "other_property_costs": {
+      "row": 37,
+      "type": "expense",
+      "description": "Other property costs"
+    },
+    "home_office": {
+      "row": 37,
+      "type": "expense",
+      "description": "Home office costs (rental portion)"
+    },
+    "mileage": {
+      "row": 37,
+      "type": "expense",
+      "description": "Travel to property (IRD rate $0.99/km)"
+    },
+    "mobile_phone": {
+      "row": 37,
+      "type": "expense",
+      "description": "Phone costs (rental portion)"
+    },
+    "water_rates": {
+      "row": 41,
+      "type": "expense",
+      "description": "GST-inclusive for non-registered"
+    },
+    "body_corporate_reserve": {
+      "row": null,
+      "type": "excluded",
+      "reason": "Capital contribution"
+    },
+    "principal_repayment": {
+      "row": null,
+      "type": "excluded",
+      "reason": "Capital repayment"
+    },
+    "transfer_between_accounts": {
+      "row": null,
+      "type": "excluded",
+      "reason": "Internal transfer"
+    },
+    "personal_expense": {
+      "row": null,
+      "type": "excluded",
+      "reason": "Not rental-related"
+    },
+    "bond_received": {
+      "row": null,
+      "type": "excluded",
+      "reason": "Not income - held in trust"
+    },
+    "bond_released": {
+      "row": null,
+      "type": "excluded",
+      "reason": "Not expense - return of trust"
+    },
+    "ffe_contribution": {
+      "row": null,
+      "type": "excluded",
+      "reason": "Capital contribution (short-term rental)"
+    },
+    "capital_improvement": {
+      "row": null,
+      "type": "excluded",
+      "reason": "Capital expense - depreciate instead"
+    },
+    "drawing": {
+      "row": null,
+      "type": "excluded",
+      "reason": "Owner withdrawal"
+    },
+    "funds_introduced": {
+      "row": null,
+      "type": "excluded",
+      "reason": "Owner contribution"
+    },
+    "loan_drawdown": {
+      "row": null,
+      "type": "excluded",
+      "reason": "Capital movement"
+    },
+    "loan_repayment": {
+      "row": null,
+      "type": "excluded",
+      "reason": "Capital repayment"
+    },
+    "interest_credit": {
+      "row": null,
+      "type": "excluded",
+      "reason": "DO NOT subtract from interest debits"
+    },
+    "unknown": {
+      "row": null,
+      "type": "flagged",
+      "reason": "Requires manual categorization"
+    }
+  }
+}

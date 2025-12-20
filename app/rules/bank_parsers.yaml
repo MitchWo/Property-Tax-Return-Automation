@@ -1,0 +1,165 @@
+# =============================================================================
+# Bank Statement Parser Configurations
+# =============================================================================
+# Each bank has different CSV/export formats. This config defines how to
+# parse transaction data from each bank's export format.
+# =============================================================================
+
+version: "1.0"
+last_updated: "2024-12-11"
+
+banks:
+  # ---------------------------------------------------------------------------
+  # ASB Bank
+  # ---------------------------------------------------------------------------
+  asb:
+    name: "ASB Bank"
+    identifiers:
+      - "ASB"
+      - "asb.co.nz"
+    csv_format:
+      date_column: 0
+      date_format: "%Y/%m/%d"
+      description_column: 1
+      amount_column: 2  # Single column (negative = debit)
+      balance_column: 3
+      has_header: true
+      delimiter: ","
+      encoding: "utf-8"
+    amount_style: "single"  # single column, negative for debits
+
+  # ---------------------------------------------------------------------------
+  # ANZ Bank
+  # ---------------------------------------------------------------------------
+  anz:
+    name: "ANZ Bank"
+    identifiers:
+      - "ANZ"
+      - "anz.co.nz"
+    csv_format:
+      date_column: 0
+      date_format: "%d/%m/%Y"
+      description_column: 1
+      debit_column: 2
+      credit_column: 3
+      balance_column: 4
+      has_header: true
+      delimiter: ","
+      encoding: "utf-8"
+    amount_style: "split"  # separate debit/credit columns
+
+  # ---------------------------------------------------------------------------
+  # Kiwibank
+  # ---------------------------------------------------------------------------
+  kiwibank:
+    name: "Kiwibank"
+    identifiers:
+      - "Kiwibank"
+      - "kiwibank.co.nz"
+    csv_format:
+      date_column: 0
+      date_format: "%d-%m-%Y"
+      description_column: 2
+      other_party_column: 1
+      amount_column: 3
+      balance_column: 4
+      has_header: true
+      delimiter: ","
+      encoding: "utf-8"
+    amount_style: "single"
+
+  # ---------------------------------------------------------------------------
+  # Westpac
+  # ---------------------------------------------------------------------------
+  westpac:
+    name: "Westpac"
+    identifiers:
+      - "Westpac"
+      - "westpac.co.nz"
+    csv_format:
+      date_column: 0
+      date_format: "%d/%m/%Y"
+      other_party_column: 1
+      description_column: 2
+      debit_column: 3
+      credit_column: 4
+      balance_column: 5
+      has_header: true
+      delimiter: ","
+      encoding: "utf-8"
+    amount_style: "split"
+
+  # ---------------------------------------------------------------------------
+  # BNZ
+  # ---------------------------------------------------------------------------
+  bnz:
+    name: "Bank of New Zealand"
+    identifiers:
+      - "BNZ"
+      - "bnz.co.nz"
+    csv_format:
+      date_column: 0
+      date_format: "%d/%m/%Y"
+      description_column: 2
+      other_party_column: 1
+      amount_column: 3
+      balance_column: 4
+      has_header: true
+      delimiter: ","
+      encoding: "utf-8"
+    amount_style: "single"
+
+  # ---------------------------------------------------------------------------
+  # TSB Bank
+  # ---------------------------------------------------------------------------
+  tsb:
+    name: "TSB Bank"
+    identifiers:
+      - "TSB"
+      - "tsb.co.nz"
+    csv_format:
+      date_column: 0
+      date_format: "%d/%m/%Y"
+      description_column: 1
+      amount_column: 2
+      balance_column: 3
+      has_header: true
+      delimiter: ","
+      encoding: "utf-8"
+    amount_style: "single"
+
+  # ---------------------------------------------------------------------------
+  # Co-operative Bank
+  # ---------------------------------------------------------------------------
+  cooperative:
+    name: "Co-operative Bank"
+    identifiers:
+      - "Co-operative"
+      - "co-operativebank.co.nz"
+    csv_format:
+      date_column: 0
+      date_format: "%d/%m/%Y"
+      description_column: 1
+      amount_column: 2
+      balance_column: 3
+      has_header: true
+      delimiter: ","
+      encoding: "utf-8"
+    amount_style: "single"
+
+  # ---------------------------------------------------------------------------
+  # Generic / Unknown
+  # ---------------------------------------------------------------------------
+  generic:
+    name: "Generic Bank"
+    identifiers: []
+    csv_format:
+      date_column: 0
+      date_format: "%d/%m/%Y"
+      description_column: 1
+      amount_column: 2
+      balance_column: 3
+      has_header: true
+      delimiter: ","
+      encoding: "utf-8"
+    amount_style: "single"

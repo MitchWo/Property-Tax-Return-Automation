@@ -1,0 +1,659 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Documents - Property Tax Review{% endblock %}
+
+{% block content %}
+<style>
+    html {
+        overflow-y: scroll;
+    }
+    .upload-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    @media (min-width: 768px) {
+        .upload-grid {
+            grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+        }
+    }
+    .upload-grid > div {
+        min-width: 0;
+    }
+    .pac-container {
+        z-index: 9999 !important;
+    }
+</style>
+<div x-data="uploadForm()" class="w-full">
+    <div class="bg-white shadow-lg rounded-lg border border-gray-200 overflow-hidden w-full">
+        <!-- Header -->
+        <div class="px-6 py-5 border-b border-gray-200">
+            <h2 class="text-2xl font-bold text-primary">Upload Tax Return Documents</h2>
+            <p class="text-gray-500 text-sm mt-1">Submit property documents for AI-powered tax return analysis</p>
+        </div>
+
+        <div class="p-6">
+            {% if error %}
+            <div class="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+                <p class="font-medium">Error:</p>
+                <p class="text-sm">{{ error }}</p>
+            </div>
+            {% endif %}
+
+            <form id="uploadForm" action="/upload" method="POST" enctype="multipart/form-data">
+                <div class="upload-grid">
+                    <!-- Left Column: Client & Property Details -->
+                    <div class="space-y-5">
+                        <!-- First Name & Last Name -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="first_name" class="block text-sm font-medium text-gray-700 mb-1">
+                                    First Name <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text" name="first_name" id="first_name" required
+                                       autocomplete="chrome-off"
+                                       class="block w-full p-3 bg-white border border-gray-300 rounded-md hover:border-accent focus:border-accent focus:ring-accent text-sm"
+                                       placeholder="John">
+                            </div>
+                            <div>
+                                <label for="last_name" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Last Name <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text" name="last_name" id="last_name" required
+                                       autocomplete="chrome-off"
+                                       class="block w-full p-3 bg-white border border-gray-300 rounded-md hover:border-accent focus:border-accent focus:ring-accent text-sm"
+                                       placeholder="Smith">
+                            </div>
+                        </div>
+
+                        <!-- Property Address -->
+                        <div>
+                            <label for="property_address" class="block text-sm font-medium text-gray-700 mb-1">
+                                Property Address <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="property_address" id="property_address" required
+                                   autocomplete="chrome-off"
+                                   class="block w-full p-3 bg-white border border-gray-300 rounded-md hover:border-accent focus:border-accent focus:ring-accent text-sm"
+                                   placeholder="123 Example Street, Auckland">
+                            <p class="mt-1 text-xs text-gray-500">Start typing to see address suggestions</p>
+                        </div>
+
+                        <!-- Tax Year & Year of Ownership -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="tax_year" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Tax Year <span class="text-red-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <select name="tax_year" id="tax_year" required
+                                            class="block w-full p-3 bg-white border border-gray-300 rounded-md hover:border-accent focus:border-accent focus:ring-accent cursor-pointer appearance-none text-sm">
+                                        <option value="FY16">FY16 (2015-2016)</option>
+                                        <option value="FY17">FY17 (2016-2017)</option>
+                                        <option value="FY18">FY18 (2017-2018)</option>
+                                        <option value="FY19">FY19 (2018-2019)</option>
+                                        <option value="FY20">FY20 (2019-2020)</option>
+                                        <option value="FY21">FY21 (2020-2021)</option>
+                                        <option value="FY22">FY22 (2021-2022)</option>
+                                        <option value="FY23">FY23 (2022-2023)</option>
+                                        <option value="FY24">FY24 (2023-2024)</option>
+                                        <option value="FY25" selected>FY25 (2024-2025)</option>
+                                        <option value="FY26">FY26 (2025-2026)</option>
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label for="year_of_ownership" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Year of Ownership <span class="text-red-500">*</span>
+                                </label>
+                                <input type="number" name="year_of_ownership" id="year_of_ownership" required
+                                       min="1" max="100" value="1"
+                                       autocomplete="chrome-off"
+                                       class="block w-full p-3 bg-white border border-gray-300 rounded-md hover:border-accent focus:border-accent focus:ring-accent text-sm">
+                            </div>
+                        </div>
+
+                        <!-- Property Type -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Property Type <span class="text-red-500">*</span>
+                            </label>
+                            <div class="grid grid-cols-3 gap-3">
+                                <label class="relative flex flex-col items-center justify-center p-3 h-16 bg-white border border-gray-300 rounded-lg hover:border-accent cursor-pointer transition-colors has-[:checked]:border-accent has-[:checked]:bg-blue-50">
+                                    <input type="radio" name="property_type" value="new_build" required
+                                           class="sr-only"
+                                           @change="propertyType = 'new_build'">
+                                    <span class="text-sm font-medium text-gray-900">New Build</span>
+                                    <span class="text-xs text-gray-500">100% interest</span>
+                                </label>
+                                <label class="relative flex flex-col items-center justify-center p-3 h-16 bg-white border border-gray-300 rounded-lg hover:border-accent cursor-pointer transition-colors has-[:checked]:border-accent has-[:checked]:bg-blue-50">
+                                    <input type="radio" name="property_type" value="existing" required
+                                           class="sr-only"
+                                           @change="propertyType = 'existing'">
+                                    <span class="text-sm font-medium text-gray-900">Existing</span>
+                                    <span class="text-xs text-gray-500">80% interest</span>
+                                </label>
+                                <label class="relative flex flex-col items-center justify-center p-3 h-16 bg-white border border-gray-300 rounded-lg hover:border-accent cursor-pointer transition-colors has-[:checked]:border-accent has-[:checked]:bg-blue-50">
+                                    <input type="radio" name="property_type" value="not_sure" required
+                                           class="sr-only"
+                                           @change="propertyType = 'not_sure'">
+                                    <span class="text-sm font-medium text-gray-900">Not Sure</span>
+                                    <span class="text-xs text-gray-500">AI suggests</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- GST Registered -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                GST Registered
+                            </label>
+                            <div class="grid grid-cols-3 gap-3">
+                                <label class="relative flex flex-col items-center justify-center p-3 h-16 bg-white border border-gray-300 rounded-lg hover:border-accent cursor-pointer transition-colors has-[:checked]:border-accent has-[:checked]:bg-blue-50">
+                                    <input type="radio" name="gst_registered" value="true"
+                                           class="sr-only"
+                                           @change="gstRegistered = 'yes'">
+                                    <span class="text-sm font-medium text-gray-900">Yes</span>
+                                    <span class="text-xs text-gray-500">GST registered</span>
+                                </label>
+                                <label class="relative flex flex-col items-center justify-center p-3 h-16 bg-white border border-gray-300 rounded-lg hover:border-accent cursor-pointer transition-colors has-[:checked]:border-accent has-[:checked]:bg-blue-50">
+                                    <input type="radio" name="gst_registered" value="false"
+                                           class="sr-only"
+                                           @change="gstRegistered = 'no'">
+                                    <span class="text-sm font-medium text-gray-900">No</span>
+                                    <span class="text-xs text-gray-500">Not registered</span>
+                                </label>
+                                <label class="relative flex flex-col items-center justify-center p-3 h-16 bg-white border border-gray-300 rounded-lg hover:border-accent cursor-pointer transition-colors has-[:checked]:border-accent has-[:checked]:bg-blue-50">
+                                    <input type="radio" name="gst_registered" value="not_sure" checked
+                                           class="sr-only"
+                                           @change="gstRegistered = 'not_sure'">
+                                    <span class="text-sm font-medium text-gray-900">Not Sure</span>
+                                    <span class="text-xs text-gray-500">AI suggests</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Document Upload -->
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Documents <span class="text-red-500">*</span>
+                            </label>
+                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-12 bg-gray-50 hover:bg-gray-100 transition-colors min-h-[250px] flex items-center justify-center"
+                                 @dragover.prevent="dragover = true"
+                                 @dragleave.prevent="dragover = false"
+                                 @drop.prevent="handleDrop($event)"
+                                 :class="{'border-accent bg-blue-50': dragover}">
+
+                                <div class="text-center">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+
+                                    <div class="mt-4">
+                                        <label for="files" class="cursor-pointer">
+                                            <span class="text-sm font-medium text-accent hover:text-accent-700">
+                                                Click to upload
+                                            </span>
+                                            <span class="text-sm text-gray-500"> or drag and drop</span>
+                                            <input id="files" name="files" type="file" multiple required
+                                                   accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv"
+                                                   class="sr-only" @change="handleFiles($event)">
+                                        </label>
+                                    </div>
+
+                                    <p class="mt-2 text-xs text-gray-500">
+                                        PDF, PNG, JPG, XLSX, XLS, CSV (max 50MB each)
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Selected Files List -->
+                        <div x-show="files.length > 0" x-cloak>
+                            <!-- Duplicate Warning -->
+                            <div x-show="duplicateWarnings.length > 0" class="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                <div class="flex">
+                                    <span class="text-yellow-600 mr-2 font-bold">!</span>
+                                    <div>
+                                        <p class="text-sm font-medium text-yellow-800">Potential duplicates detected:</p>
+                                        <ul class="mt-1 text-sm text-yellow-700">
+                                            <template x-for="warning in duplicateWarnings" :key="warning">
+                                                <li x-text="warning"></li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-sm text-gray-700 mb-2">
+                                <span x-text="files.length"></span> file<span x-show="files.length > 1">s</span> selected
+                            </div>
+                            <ul class="divide-y divide-gray-200 border border-gray-200 rounded-md bg-white max-h-64 overflow-y-auto">
+                                <template x-for="(file, index) in files" :key="index">
+                                    <li class="px-3 py-2 flex items-center justify-between text-sm"
+                                        :class="{'bg-yellow-50': isDuplicate(file)}">
+                                        <div class="flex items-center min-w-0 flex-1">
+                                            <span x-show="isDuplicate(file)" class="text-yellow-500 mr-2 font-bold" title="Potential duplicate">!</span>
+                                            <span class="truncate" x-text="file.name"></span>
+                                            <span class="ml-2 text-gray-400 flex-shrink-0" x-text="formatFileSize(file.size)"></span>
+                                        </div>
+                                        <button type="button" @click="removeFile(index)"
+                                                class="ml-3 text-gray-400 hover:text-red-600">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
+                                        </button>
+                                    </li>
+                                </template>
+                            </ul>
+                        </div>
+
+                        <!-- Required Documents Info -->
+                        <div class="p-3 bg-blue-50 border border-blue-100 rounded-md h-[72px] relative">
+                            <p class="text-sm text-blue-800 absolute inset-3" x-show="!propertyType">
+                                <strong>Info:</strong> Select a property type above to see document requirements
+                            </p>
+                            <p class="text-sm text-blue-800 absolute inset-3" x-show="propertyType === 'new_build'" x-cloak>
+                                <strong>Required:</strong> Settlement statement, CCC, bank statements, loan statements
+                            </p>
+                            <p class="text-sm text-blue-800 absolute inset-3" x-show="propertyType === 'existing'" x-cloak>
+                                <strong>Required:</strong> Bank statements showing rental income
+                            </p>
+                            <p class="text-sm text-blue-800 absolute inset-3" x-show="propertyType === 'not_sure'" x-cloak>
+                                <strong>Tip:</strong> Upload all available documents - AI will analyze and suggest property type
+                            </p>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit"
+                                :disabled="isSubmitting || files.length === 0"
+                                class="w-full py-3 px-6 border border-transparent shadow-sm text-base font-medium rounded-md text-white bg-accent hover:bg-accent-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            <span x-show="!isSubmitting">Process Documents</span>
+                            <span x-show="isSubmitting" class="flex items-center justify-center">
+                                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Processing...
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Processing Progress Overlay -->
+    <div x-show="isSubmitting" x-cloak
+         class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
+            <!-- Header -->
+            <div class="bg-primary px-6 py-4">
+                <h3 class="text-lg font-semibold text-white flex items-center">
+                    <svg class="animate-spin mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing Documents
+                </h3>
+            </div>
+
+            <!-- Progress Content -->
+            <div class="px-6 py-4">
+                <!-- Overall Progress Bar -->
+                <div class="mb-4">
+                    <div class="flex justify-between text-sm text-gray-600 mb-1">
+                        <span>Overall Progress</span>
+                        <span x-text="Math.round(overallProgress) + '%'"></span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-accent h-2 rounded-full transition-all duration-500"
+                             :style="'width: ' + overallProgress + '%'"></div>
+                    </div>
+                </div>
+
+                <!-- Current Stage -->
+                <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                    <p class="text-sm font-medium text-gray-900" x-text="currentStage"></p>
+                    <p class="text-xs text-gray-500 mt-1" x-text="currentStageDetail"></p>
+                </div>
+
+                <!-- Document List -->
+                <div class="space-y-2 max-h-48 overflow-y-auto">
+                    <template x-for="(file, index) in files" :key="index">
+                        <div class="flex items-center justify-between p-2 rounded text-sm"
+                             :class="{
+                                 'bg-green-50': fileStatuses[index] === 'complete',
+                                 'bg-blue-50': fileStatuses[index] === 'processing',
+                                 'bg-gray-50': fileStatuses[index] === 'pending'
+                             }">
+                            <div class="flex items-center min-w-0 flex-1">
+                                <!-- Status Icon -->
+                                <span class="flex-shrink-0 mr-2">
+                                    <template x-if="fileStatuses[index] === 'complete'">
+                                        <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                    </template>
+                                    <template x-if="fileStatuses[index] === 'processing'">
+                                        <svg class="w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    </template>
+                                    <template x-if="fileStatuses[index] === 'pending'">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                    </template>
+                                </span>
+                                <!-- Filename -->
+                                <span class="truncate text-gray-700" x-text="file.name"></span>
+                            </div>
+                            <!-- Status Text -->
+                            <span class="flex-shrink-0 ml-2 text-xs"
+                                  :class="{
+                                      'text-green-600': fileStatuses[index] === 'complete',
+                                      'text-blue-600': fileStatuses[index] === 'processing',
+                                      'text-gray-400': fileStatuses[index] === 'pending'
+                                  }"
+                                  x-text="fileStatuses[index] === 'complete' ? 'Done' : fileStatuses[index] === 'processing' ? 'Analyzing...' : 'Pending'">
+                            </span>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Estimated Time -->
+                <div class="mt-4 text-center">
+                    <p class="text-xs text-gray-500">
+                        <span x-show="estimatedTimeRemaining > 0">
+                            Estimated time remaining: <span x-text="Math.ceil(estimatedTimeRemaining / 1000)"></span>s
+                        </span>
+                        <span x-show="estimatedTimeRemaining <= 0">
+                            Finalizing...
+                        </span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="bg-gray-50 px-6 py-4 flex items-center justify-between">
+                <p class="text-xs text-gray-500">
+                    Please don't close this page while documents are being analyzed.
+                </p>
+                <button type="button" @click="cancelUpload()"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Google Maps Places API -->
+{% if google_maps_api_key %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places&callback=initAutocomplete" async defer></script>
+<script>
+function initAutocomplete() {
+    const input = document.getElementById('property_address');
+    if (!input) return;
+
+    const autocomplete = new google.maps.places.Autocomplete(input, {
+        componentRestrictions: { country: 'nz' },
+        types: ['address'],
+        fields: ['formatted_address', 'address_components']
+    });
+
+    autocomplete.addListener('place_changed', function() {
+        const place = autocomplete.getPlace();
+        if (place.formatted_address) {
+            input.value = place.formatted_address;
+        }
+    });
+}
+</script>
+{% endif %}
+
+<script>
+function uploadForm() {
+    return {
+        files: [],
+        dragover: false,
+        isSubmitting: false,
+        propertyType: null,
+        gstRegistered: 'not_sure',
+        duplicateWarnings: [],
+        overallProgress: 0,
+        currentStage: 'Initializing...',
+        currentStageDetail: 'Preparing to process your documents',
+        fileStatuses: [],
+        estimatedTimeRemaining: 0,
+        progressInterval: null,
+
+        handleFiles(event) {
+            const newFiles = Array.from(event.target.files);
+            this.addFiles(newFiles);
+        },
+
+        handleDrop(event) {
+            this.dragover = false;
+            const newFiles = Array.from(event.dataTransfer.files);
+            this.addFiles(newFiles);
+        },
+
+        addFiles(newFiles) {
+            const existingNames = this.files.map(f => f.name.toLowerCase());
+            this.duplicateWarnings = [];
+
+            newFiles.forEach(file => {
+                const lowerName = file.name.toLowerCase();
+                if (existingNames.includes(lowerName)) {
+                    this.duplicateWarnings.push(`"${file.name}" is already in the list`);
+                } else {
+                    const baseName = lowerName.replace(/\.[^/.]+$/, "").replace(/[-_\s]+/g, '');
+                    existingNames.forEach((existing, idx) => {
+                        const existingBase = existing.replace(/\.[^/.]+$/, "").replace(/[-_\s]+/g, '');
+                        if (baseName === existingBase && lowerName !== existing) {
+                            this.duplicateWarnings.push(`"${file.name}" may be a duplicate of "${this.files[idx].name}"`);
+                        }
+                    });
+                    this.files.push(file);
+                    existingNames.push(lowerName);
+                }
+            });
+        },
+
+        isDuplicate(file) {
+            return this.duplicateWarnings.some(w => w.includes(file.name));
+        },
+
+        removeFile(index) {
+            this.files.splice(index, 1);
+            this.duplicateWarnings = [];
+        },
+
+        formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        },
+
+        eventSource: null,
+        cancelled: false,
+
+        init() {
+            const form = document.getElementById('uploadForm');
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                if (this.files.length === 0) {
+                    return;
+                }
+
+                this.isSubmitting = true;
+                this.cancelled = false;
+                this.overallProgress = 0;
+                this.fileStatuses = this.files.map(() => 'pending');
+
+                // Use SSE for real-time progress
+                await this.submitWithSSE(form);
+            });
+        },
+
+        cancelUpload() {
+            this.cancelled = true;
+            this.isSubmitting = false;
+            this.overallProgress = 0;
+            this.currentStage = 'Initializing...';
+            this.currentStageDetail = 'Preparing to process your documents';
+            this.fileStatuses = [];
+
+            // Close SSE connection if open
+            if (this.eventSource) {
+                this.eventSource.close();
+            }
+
+            window.location.reload();
+        },
+
+        async submitWithSSE(form) {
+            const formData = new FormData(form);
+
+            // Remove the original files from FormData and add all accumulated files
+            // This is necessary because the HTML input only holds the last selection,
+            // but our Alpine.js files array accumulates across multiple selections
+            formData.delete('files');
+            this.files.forEach(file => {
+                formData.append('files', file);
+            });
+
+            // Stage name mapping
+            const stageNames = {
+                'initializing': 'Initializing',
+                'loading_documents': 'Uploading documents',
+                'reading_transactions': 'Processing documents',
+                'categorizing': 'AI Analysis',
+                'applying_feedback': 'Applying corrections',
+                'querying_rag': 'Querying patterns',
+                'generating_summaries': 'Generating report',
+                'finalizing': 'Finalizing',
+                'complete': 'Complete!',
+                'error': 'Error'
+            };
+
+            try {
+                // First upload the files to get the SSE stream
+                const response = await fetch('/api/returns/upload-stream', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+
+                // Read the SSE stream
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+
+                    if (done || this.cancelled) {
+                        console.log('Stream ended. done:', done, 'cancelled:', this.cancelled);
+                        break;
+                    }
+
+                    buffer += decoder.decode(value, { stream: true });
+
+                    // Process complete SSE events
+                    const lines = buffer.split('\n\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                console.log('SSE event:', data);
+
+                                // Update progress
+                                this.overallProgress = data.progress;
+                                this.currentStage = stageNames[data.stage] || data.stage;
+                                this.currentStageDetail = data.detail || data.message;
+
+                                // Update file statuses
+                                if (this.overallProgress >= 10 && this.files.length > 0) {
+                                    const progressPerFile = 80 / this.files.length;
+                                    const fileProgress = (this.overallProgress - 10) / progressPerFile;
+
+                                    for (let i = 0; i < this.files.length; i++) {
+                                        if (i < Math.floor(fileProgress)) {
+                                            this.fileStatuses[i] = 'complete';
+                                        } else if (i === Math.floor(fileProgress)) {
+                                            this.fileStatuses[i] = 'processing';
+                                        }
+                                    }
+                                }
+
+                                if (this.overallProgress >= 90) {
+                                    this.fileStatuses = this.files.map(() => 'complete');
+                                }
+
+                                // Handle completion - detail contains tax_return_id
+                                if (data.stage === 'complete') {
+                                    console.log('COMPLETE event received! detail:', data.detail);
+                                    this.overallProgress = 100;
+                                    this.fileStatuses = this.files.map(() => 'complete');
+
+                                    // Redirect to results page
+                                    if (data.detail) {
+                                        console.log('Redirecting to:', `/result/${data.detail}`);
+                                        setTimeout(() => {
+                                            window.location.href = `/result/${data.detail}`;
+                                        }, 1000);
+                                    } else {
+                                        console.error('No detail in complete event!', data);
+                                    }
+                                    return;
+                                }
+
+                                // Handle error
+                                if (data.stage === 'error') {
+                                    throw new Error(data.detail || data.message);
+                                }
+                            } catch (parseError) {
+                                console.error('Error parsing SSE data:', parseError);
+                            }
+                        }
+                    }
+                }
+
+            } catch (error) {
+                console.error('Upload error:', error);
+                this.isSubmitting = false;
+                this.currentStage = 'Error';
+                this.currentStageDetail = error.message;
+
+                // Fallback to traditional form submission
+                if (!this.cancelled) {
+                    console.log('Falling back to traditional form submission');
+                    form.submit();
+                }
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

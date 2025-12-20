@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+
+{% block title %}Categorization Audit Report - {{ property_address }}{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-9xl mx-auto space-y-6" x-data="auditManager()">
+
+    <!-- Header -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900">Categorization Audit Report</h2>
+                <p class="mt-1 text-sm text-gray-500">
+                    {{ property_address }} - Tax Year: {{ tax_year }}
+                </p>
+                <p class="text-sm text-gray-500">
+                    Generated: <span x-text="generatedTime">Loading...</span>
+                </p>
+            </div>
+            <div class="flex space-x-3">
+                <a href="/workings/{{ tax_return_id }}"
+                   class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    ← Back to Workings
+                </a>
+                <button @click="printReport()"
+                        class="px-4 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700">
+                    Print Report
+                </button>
+                <a href="/api/categorization/{{ tax_return_id }}/audit-report"
+                   class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700">
+                    Download JSON
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Summary Statistics</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-gray-50 rounded-lg p-4">
+                <div class="text-xs font-medium text-gray-600 uppercase tracking-wide">Total Transactions</div>
+                <div class="text-2xl font-bold text-gray-900 mt-1" x-text="totalTransactions">Loading...</div>
+            </div>
+            <div class="bg-blue-50 rounded-lg p-4">
+                <div class="text-xs font-medium text-blue-600 uppercase tracking-wide">AI Categorized</div>
+                <div class="text-2xl font-bold text-blue-900 mt-1" x-text="aiCategorized">Loading...</div>
+                <div class="text-xs text-blue-600 mt-1" x-text="aiPercentage"></div>
+            </div>
+            <div class="bg-green-50 rounded-lg p-4">
+                <div class="text-xs font-medium text-green-600 uppercase tracking-wide">Pattern Matched</div>
+                <div class="text-2xl font-bold text-green-900 mt-1" x-text="patternMatched">Loading...</div>
+                <div class="text-xs text-green-600 mt-1" x-text="patternPercentage"></div>
+            </div>
+            <div class="bg-yellow-50 rounded-lg p-4">
+                <div class="text-xs font-medium text-yellow-600 uppercase tracking-wide">Needs Review</div>
+                <div class="text-2xl font-bold text-yellow-900 mt-1" x-text="needsReview">Loading...</div>
+                <div class="text-xs text-yellow-600 mt-1">Manual review required</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Categorization Source Breakdown -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Categorization Source Breakdown</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" x-ref="sourceBreakdown">
+            <!-- Populated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Insights & Recommendations -->
+    <div class="bg-white shadow rounded-lg p-6" x-show="insights.length > 0">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Insights & Recommendations</h3>
+        <div class="space-y-3" x-ref="insights">
+            <!-- Populated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Category Breakdown Table -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Category Breakdown with Transaction Details</h3>
+            <p class="text-sm text-gray-600 mt-1">Click on any category row to expand and see all transactions in that category.</p>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="w-8 px-3 py-3"></th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">P&L Row</th>
+                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categorization Methods</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" x-ref="categoryTableBody">
+                    <!-- Populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Transactions Needing Review -->
+    <div class="bg-white shadow rounded-lg p-6" x-show="problemTransactions.length > 0">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Transactions Needing Review</h3>
+        <div class="space-y-3" x-ref="problemTransactions">
+            <!-- Populated by JavaScript -->
+        </div>
+    </div>
+</div>
+
+<script>
+function auditManager() {
+    return {
+        // State
+        taxReturnId: "{{ tax_return_id }}",
+        auditData: null,
+        categoryTransactions: {},
+        expandedCategories: new Set(),
+
+        // Display values
+        generatedTime: 'Loading...',
+        totalTransactions: 'Loading...',
+        aiCategorized: 'Loading...',
+        aiPercentage: '',
+        patternMatched: 'Loading...',
+        patternPercentage: '',
+        needsReview: 'Loading...',
+        insights: [],
+        problemTransactions: [],
+
+        async init() {
+            await this.loadAuditReport();
+        },
+
+        async loadAuditReport() {
+            try {
+                const response = await fetch(`/api/categorization/${this.taxReturnId}/audit-report`);
+                this.auditData = await response.json();
+
+                this.updateSummaryStats();
+                this.renderSourceBreakdown();
+                this.renderInsights();
+                this.renderCategoryTable();
+                this.loadProblemTransactions();
+
+            } catch (error) {
+                console.error('Failed to load audit report:', error);
+                this.showNotification('Failed to load audit report. Please try again.', 'error');
+            }
+        },
+
+        updateSummaryStats() {
+            const summary = this.auditData.summary;
+
+            // Update generated time
+            this.generatedTime = new Date(this.auditData.generated_at).toLocaleString();
+
+            // Update statistics
+            this.totalTransactions = summary.total_transactions.toLocaleString();
+
+            const aiCount = summary.pattern_effectiveness.claude_categorized +
+                          summary.pattern_effectiveness.extraction_categorized;
+            this.aiCategorized = aiCount.toLocaleString();
+            this.aiPercentage = `${(aiCount / summary.total_transactions * 100).toFixed(1)}% of total`;
+
+            const patternCount = summary.pattern_effectiveness.yaml_patterns +
+                               summary.pattern_effectiveness.learned_patterns;
+            this.patternMatched = patternCount.toLocaleString();
+            this.patternPercentage = `${(patternCount / summary.total_transactions * 100).toFixed(1)}% of total`;
+
+            this.needsReview = summary.review_required.toLocaleString();
+        },
+
+        renderSourceBreakdown() {
+            const container = this.$refs.sourceBreakdown;
+            container.innerHTML = '';
+
+            for (const [source, data] of Object.entries(this.auditData.summary.categorization_sources)) {
+                const div = document.createElement('div');
+                div.className = 'text-center bg-gray-50 rounded-lg p-4';
+                div.innerHTML = `
+                    <div class="text-sm font-medium text-gray-900">${this.formatSource(source)}</div>
+                    <div class="text-2xl font-bold text-blue-600 mt-1">${data.count}</div>
+                    <div class="text-xs text-gray-600 mt-1">Avg: ${(data.avg_confidence * 100).toFixed(0)}%</div>
+                `;
+                container.appendChild(div);
+            }
+        },
+
+        renderInsights() {
+            const container = this.$refs.insights;
+            if (!container) return;
+
+            container.innerHTML = '';
+            this.insights = this.auditData.insights || [];
+
+            this.insights.forEach(insight => {
+                const div = document.createElement('div');
+                const colorClasses = {
+                    'info': 'bg-blue-50 border-l-4 border-blue-400 text-blue-700',
+                    'warning': 'bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700',
+                    'error': 'bg-red-50 border-l-4 border-red-400 text-red-700'
+                };
+                div.className = `p-4 ${colorClasses[insight.type] || colorClasses.info}`;
+                div.textContent = insight.message;
+                container.appendChild(div);
+            });
+        },
+
+        renderCategoryTable() {
+            const tbody = this.$refs.categoryTableBody;
+            tbody.innerHTML = '';
+
+            let lastTransactionType = '';
+
+            this.auditData.category_details.forEach((category, index) => {
+                // Add section headers for transaction types
+                if (category.transaction_type !== lastTransactionType) {
+                    const headerRow = document.createElement('tr');
+                    headerRow.className = 'bg-gray-100';
+
+                    let headerText = '';
+                    let headerClass = '';
+
+                    if (category.transaction_type === 'income') {
+                        headerText = '💰 INCOME';
+                        headerClass = 'text-green-700 font-bold';
+                    } else if (category.transaction_type === 'expense') {
+                        headerText = '💸 EXPENSES';
+                        headerClass = 'text-red-700 font-bold';
+                    } else if (category.transaction_type === 'excluded') {
+                        headerText = '🚫 EXCLUDED (Non-deductible)';
+                        headerClass = 'text-gray-700 font-bold';
+                    } else {
+                        headerText = '❓ UNCATEGORIZED';
+                        headerClass = 'text-yellow-700 font-bold';
+                    }
+
+                    headerRow.innerHTML = `
+                        <td colspan="6" class="px-6 py-2">
+                            <div class="${headerClass} text-sm uppercase tracking-wider">
+                                ${headerText}
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(headerRow);
+                    lastTransactionType = category.transaction_type;
+                }
+
+                // Main category row
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 cursor-pointer';
+                row.onclick = () => this.toggleCategoryDetails(category.category_code, index);
+
+                const methodsHtml = category.categorization_methods
+                    .map(m => `
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${this.getSourceBadgeClass(m.source)} mr-1">
+                            ${this.formatSource(m.source)}: ${m.count} (${m.percentage.toFixed(0)}%)
+                        </span>
+                    `).join('');
+
+                row.innerHTML = `
+                    <td class="px-3 py-4">
+                        <svg class="w-4 h-4 text-gray-400 transition-transform ${this.expandedCategories.has(index) ? 'rotate-90' : ''}"
+                             fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">${category.display_name}</div>
+                        ${category.pl_row ? `<div class="text-xs text-gray-500">P&L Row ${category.pl_row}</div>` : ''}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                        ${category.pl_row || '-'}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                        ${category.total_count}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium ${category.total_amount >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        $${Math.abs(category.total_amount).toFixed(2)}
+                    </td>
+                    <td class="px-6 py-4 text-sm">
+                        <div class="flex flex-wrap">${methodsHtml}</div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+
+                // Details row (hidden by default)
+                const detailsRow = document.createElement('tr');
+                detailsRow.className = this.expandedCategories.has(index) ? '' : 'hidden';
+                detailsRow.id = `details-${index}`;
+                detailsRow.innerHTML = `
+                    <td colspan="6" class="px-6 py-4 bg-gray-50">
+                        <div id="details-content-${index}">
+                            <div class="text-center py-4">
+                                <svg class="animate-spin h-8 w-8 mx-auto text-blue-600" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <p class="mt-2 text-sm text-gray-500">Loading transactions...</p>
+                            </div>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(detailsRow);
+            });
+        },
+
+        async toggleCategoryDetails(categoryCode, index) {
+            const detailsRow = document.getElementById(`details-${index}`);
+            const icon = event.currentTarget.querySelector('svg');
+
+            if (this.expandedCategories.has(index)) {
+                // Collapse
+                this.expandedCategories.delete(index);
+                detailsRow.classList.add('hidden');
+                icon.classList.remove('rotate-90');
+            } else {
+                // Expand
+                this.expandedCategories.add(index);
+                detailsRow.classList.remove('hidden');
+                icon.classList.add('rotate-90');
+
+                // Load transactions if not already loaded
+                if (!this.categoryTransactions[categoryCode]) {
+                    await this.loadCategoryTransactions(categoryCode, index);
+                }
+            }
+        },
+
+        async loadCategoryTransactions(categoryCode, index) {
+            try {
+                const response = await fetch(`/api/categorization/${this.taxReturnId}/category-transactions/${categoryCode}`);
+                const transactions = await response.json();
+                this.categoryTransactions[categoryCode] = transactions;
+                this.renderCategoryTransactions(transactions, index);
+            } catch (error) {
+                console.error('Failed to load transactions:', error);
+                document.getElementById(`details-content-${index}`).innerHTML =
+                    '<p class="text-red-600 text-center py-4">Failed to load transactions</p>';
+            }
+        },
+
+        renderCategoryTransactions(transactions, index) {
+            const container = document.getElementById(`details-content-${index}`);
+
+            if (transactions.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-4">No transactions in this category.</p>';
+                return;
+            }
+
+            // Calculate stats
+            const avgConfidence = transactions.reduce((sum, t) => sum + (t.confidence || 0), 0) / transactions.length;
+            const needsReviewCount = transactions.filter(t => t.needs_review).length;
+
+            let html = `
+                <div class="grid grid-cols-4 gap-4 mb-4 p-4 bg-blue-50 rounded-lg">
+                    <div class="text-center">
+                        <div class="text-xs text-gray-600 uppercase">Transactions</div>
+                        <div class="text-xl font-bold">${transactions.length}</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-xs text-gray-600 uppercase">Avg Confidence</div>
+                        <div class="text-xl font-bold">${(avgConfidence * 100).toFixed(0)}%</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-xs text-gray-600 uppercase">Needs Review</div>
+                        <div class="text-xl font-bold">${needsReviewCount}</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-xs text-gray-600 uppercase">Total Amount</div>
+                        <div class="text-xl font-bold">$${Math.abs(transactions.reduce((sum, t) => sum + t.amount, 0)).toFixed(2)}</div>
+                    </div>
+                </div>
+
+                <div class="space-y-2 max-h-96 overflow-y-auto">
+            `;
+
+            transactions.forEach(trans => {
+                const confidenceBadge = this.getConfidenceBadge(trans.confidence);
+
+                html += `
+                    <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:shadow-sm">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm font-medium text-gray-900">
+                                    ${new Date(trans.date).toLocaleDateString()}
+                                </span>
+                                <span class="text-sm text-gray-600">${trans.description}</span>
+                                ${trans.other_party ? `<span class="text-sm text-gray-500 italic">(${trans.other_party})</span>` : ''}
+                            </div>
+                            <div class="flex items-center space-x-2 mt-1">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${this.getSourceBadgeClass(trans.categorization_source)}">
+                                    ${this.formatSource(trans.categorization_source)}
+                                </span>
+                                ${confidenceBadge}
+                                ${trans.needs_review ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Review</span>' : ''}
+                                ${trans.manually_reviewed ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Reviewed</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="text-right ml-4">
+                            <div class="text-sm font-medium ${trans.amount >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                ${trans.amount >= 0 ? '+' : ''}$${Math.abs(trans.amount).toFixed(2)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            container.innerHTML = html;
+        },
+
+        async loadProblemTransactions() {
+            try {
+                const response = await fetch(`/api/categorization/${this.taxReturnId}/problem-transactions`);
+                const problems = await response.json();
+
+                const container = this.$refs.problemTransactions;
+                if (!container) return;
+
+                this.problemTransactions = problems || [];
+
+                if (this.problemTransactions.length > 0) {
+                    container.innerHTML = '';
+                    this.problemTransactions.forEach(trans => {
+                        const div = document.createElement('div');
+                        div.className = 'p-4 bg-yellow-50 border-l-4 border-yellow-400';
+                        div.innerHTML = `
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-sm font-medium text-gray-900">
+                                        ${new Date(trans.date).toLocaleDateString()} - ${trans.description}
+                                    </div>
+                                    <div class="text-sm text-gray-600 mt-1">
+                                        ${trans.issues.join(' • ')}
+                                    </div>
+                                </div>
+                                <div class="text-sm font-medium ${trans.amount >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                    $${Math.abs(trans.amount).toFixed(2)}
+                                </div>
+                            </div>
+                        `;
+                        container.appendChild(div);
+                    });
+                } else {
+                    container.innerHTML = '<p class="text-gray-500">No transactions requiring review.</p>';
+                }
+            } catch (error) {
+                console.error('Failed to load problem transactions:', error);
+            }
+        },
+
+        formatSource(source) {
+            const sourceMap = {
+                'extraction': 'AI Extraction',
+                'claude': 'Claude AI',
+                'yaml_pattern': 'YAML Pattern',
+                'yaml_payee': 'YAML Payee',
+                'learned_exact': 'Learned Pattern',
+                'learned_fuzzy': 'Fuzzy Match',
+                'manual': 'Manual',
+                'none': 'None'
+            };
+            return sourceMap[source] || source;
+        },
+
+        getSourceBadgeClass(source) {
+            const classes = {
+                'extraction': 'bg-green-100 text-green-800',
+                'claude': 'bg-blue-100 text-blue-800',
+                'yaml_pattern': 'bg-yellow-100 text-yellow-800',
+                'yaml_payee': 'bg-yellow-100 text-yellow-800',
+                'learned_exact': 'bg-purple-100 text-purple-800',
+                'learned_fuzzy': 'bg-purple-100 text-purple-800',
+                'manual': 'bg-gray-100 text-gray-800'
+            };
+            return classes[source] || 'bg-gray-100 text-gray-800';
+        },
+
+        getConfidenceBadge(confidence) {
+            if (!confidence) return '';
+
+            const percentage = (confidence * 100).toFixed(0);
+            let colorClass = 'bg-gray-100 text-gray-800';
+
+            if (confidence >= 0.8) {
+                colorClass = 'bg-green-100 text-green-800';
+            } else if (confidence >= 0.5) {
+                colorClass = 'bg-yellow-100 text-yellow-800';
+            } else {
+                colorClass = 'bg-red-100 text-red-800';
+            }
+
+            return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colorClass}">${percentage}%</span>`;
+        },
+
+        printReport() {
+            window.print();
+        },
+
+        showNotification(message, type = 'info') {
+            // You can implement a toast notification here
+            alert(message);
+        }
+    }
+}
+</script>
+
+<style>
+@media print {
+    .no-print {
+        display: none !important;
+    }
+}
+
+/* Hide Alpine.js cloaked elements until initialized */
+[x-cloak] {
+    display: none !important;
+}
+</style>
+{% endblock %}

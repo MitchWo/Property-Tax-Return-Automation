@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}All Returns - Property Tax Review{% endblock %}
+
+{% block content %}
+<div class="w-full">
+    <div class="bg-white shadow rounded-lg border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <div>
+                <h2 class="text-2xl font-bold text-primary">All Tax Returns</h2>
+                <p class="text-sm text-gray-500 mt-1">{{ returns|length }} total returns</p>
+            </div>
+            <a href="/" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-accent hover:bg-accent-700">
+                + New Upload
+            </a>
+        </div>
+
+        {% if returns %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tax Year</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for tr in returns %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {{ tr.client.name }}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                            {{ tr.property_address }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ tr.tax_year }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            {% set ai_suggestion = tr.review_result.property_type_suggestion.suggested_type if tr.review_result and tr.review_result.property_type_suggestion else none %}
+                            {% if ai_suggestion %}
+                                {% if ai_suggestion == "new_build" %}
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">New Build</span>
+                                {% else %}
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Existing</span>
+                                {% endif %}
+                            {% elif tr.property_type.value == "new_build" %}
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">New Build</span>
+                            {% elif tr.property_type.value == "not_sure" %}
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">Not Sure</span>
+                            {% else %}
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Existing</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if tr.status.value == "complete" %}
+                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Complete</span>
+                            {% elif tr.status.value == "blocked" %}
+                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Blocked</span>
+                            {% elif tr.status.value == "incomplete" %}
+                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Incomplete</span>
+                            {% else %}
+                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ tr.created_at.strftime('%d %b %Y %H:%M') }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <a href="/result/{{ tr.id }}" class="text-accent hover:text-accent-700">View</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-12 text-gray-500">
+            <p class="text-lg">No tax returns yet</p>
+            <p class="text-sm mt-1">
+                <a href="/" class="text-accent hover:text-accent-700">Upload documents</a> to create your first return
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

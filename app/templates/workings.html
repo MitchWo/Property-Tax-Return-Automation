@@ -1,0 +1,1548 @@
+{% extends "base.html" %}
+
+{% block title %}Tax Return Workings - Property Tax{% endblock %}
+
+{% block content %}
+<div class="w-full space-y-6" x-data="unifiedWorkings()">
+    <!-- Header -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-primary">Tax Return Workings</h2>
+                <p class="mt-1 text-sm text-gray-500">{{ tax_return.property_address }}</p>
+                <p class="mt-1 text-xs text-gray-400">
+                    ID: {{ tax_return.id }} | Tax Year: {{ tax_return.tax_year }} |
+                    Type: {{ "New Build" if tax_return.property_type.value == "new_build" else "Existing" }}
+                </p>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <!-- Back to Review -->
+                <a href="/result/{{ tax_return.id }}"
+                   class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    ← Back to Review
+                </a>
+
+                <!-- Status Badge -->
+                {% if workings %}
+                <span class="px-4 py-2 rounded-full font-medium text-sm
+                    {% if workings.status.value == 'approved' %}bg-green-100 text-green-800
+                    {% elif workings.status.value == 'in_review' %}bg-yellow-100 text-yellow-800
+                    {% elif workings.status.value == 'submitted' %}bg-blue-100 text-blue-800
+                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                    {{ workings.status.value|upper|replace('_', ' ') }}
+                </span>
+                {% endif %}
+
+                <!-- Process/Reprocess Button -->
+                <button @click="processWorkings()"
+                        :disabled="processing"
+                        class="inline-flex items-center px-4 py-2 bg-accent text-white rounded-md hover:bg-accent-700 font-medium text-sm disabled:opacity-50">
+                    <template x-if="!processing">
+                        <span class="flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            {{ 'Reprocess' if workings else 'Generate Workings' }}
+                        </span>
+                    </template>
+                    <template x-if="processing">
+                        <span class="flex items-center">
+                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Processing...
+                        </span>
+                    </template>
+                </button>
+
+                <!-- Export Excel Button -->
+                <button @click="generateWorkbook()"
+                        :disabled="generatingWorkbook"
+                        class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium text-sm disabled:opacity-50">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span x-show="!generatingWorkbook">Export Excel</span>
+                    <span x-show="generatingWorkbook" x-cloak>Generating...</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Workbook download link -->
+        <div x-show="workbookReady" x-cloak class="mt-4 p-4 bg-green-50 border border-green-200 rounded-md">
+            <div class="flex items-center justify-between">
+                <span class="text-green-800">Workbook generated successfully</span>
+                <a :href="workbookUrl"
+                   class="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700">
+                    Download Excel
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards (Always Visible) -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <!-- Income -->
+        <div class="bg-green-50 border border-green-200 shadow rounded-lg p-4">
+            <div class="text-xs font-medium text-green-600 uppercase tracking-wide">Total Income</div>
+            <div class="text-2xl font-bold text-green-900 mt-1" x-text="formatCurrency(totalIncome)">
+                ${{ "%.2f"|format(workings.total_income or 0) if workings else '0.00' }}
+            </div>
+            <div class="text-xs text-green-600 mt-1">Rent, rates recovered, etc.</div>
+        </div>
+
+        <!-- Interest -->
+        <div class="bg-amber-50 border border-amber-200 shadow rounded-lg p-4">
+            <div class="text-xs font-medium text-amber-600 uppercase tracking-wide">Interest Expense</div>
+            <div class="text-2xl font-bold text-amber-900 mt-1" x-text="formatCurrency(interestExpense)">
+                ${{ "%.2f"|format(workings.interest_deductible_amount or 0) if workings else '0.00' }}
+            </div>
+            <div class="text-xs text-amber-600 mt-1">
+                {{ "%.0f"|format(workings.interest_deductible_percentage or 0) if workings else '0' }}% deductible
+            </div>
+        </div>
+
+        <!-- Other Expenses -->
+        <div class="bg-orange-50 border border-orange-200 shadow rounded-lg p-4">
+            <div class="text-xs font-medium text-orange-600 uppercase tracking-wide">Other Expenses</div>
+            <div class="text-2xl font-bold text-orange-900 mt-1" x-text="formatCurrency(otherExpenses)">
+                ${{ "%.2f"|format((workings.total_deductions or 0) - (workings.interest_deductible_amount or 0)) if workings else '0.00' }}
+            </div>
+            <div class="text-xs text-orange-600 mt-1">Rates, insurance, repairs, etc.</div>
+        </div>
+
+        <!-- Total Deductions -->
+        <div class="bg-red-50 border border-red-200 shadow rounded-lg p-4">
+            <div class="text-xs font-medium text-red-600 uppercase tracking-wide">Total Deductions</div>
+            <div class="text-2xl font-bold text-red-900 mt-1" x-text="formatCurrency(totalDeductions)">
+                ${{ "%.2f"|format(workings.total_deductions or 0) if workings else '0.00' }}
+            </div>
+            <div class="text-xs text-red-600 mt-1">Interest + other expenses</div>
+        </div>
+
+        <!-- Net Rental Income -->
+        <div class="bg-blue-50 border-2 border-blue-400 shadow-lg rounded-lg p-4">
+            <div class="text-xs font-medium text-blue-600 uppercase tracking-wide">Net Rental Income</div>
+            <div class="text-2xl font-bold mt-1" :class="netRentalIncome >= 0 ? 'text-blue-900' : 'text-red-600'" x-text="formatCurrency(netRentalIncome)">
+                ${{ "%.2f"|format(workings.net_rental_income or 0) if workings else '0.00' }}
+            </div>
+            <div class="text-xs text-blue-600 mt-1">Taxable amount for IR3R</div>
+        </div>
+
+        <!-- Needs Review -->
+        <div class="bg-yellow-50 border border-yellow-200 shadow rounded-lg p-4">
+            <div class="text-xs font-medium text-yellow-600 uppercase tracking-wide">Needs Review</div>
+            <div class="text-2xl font-bold text-yellow-900 mt-1" x-text="needsReviewCount">
+                {{ open_flags_count|default(0) }}
+            </div>
+            <div class="text-xs text-yellow-600 mt-1">
+                <span x-show="needsReviewCount > 0">Items requiring attention</span>
+                <span x-show="needsReviewCount === 0">All items reviewed</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs Navigation -->
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="border-b border-gray-200">
+            <nav class="flex -mb-px" aria-label="Tabs">
+                <button @click="activeTab = 'workings'"
+                        :class="activeTab === 'workings' ? 'border-accent text-accent' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors">
+                    <svg class="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    P&L Workings
+                </button>
+                <button @click="activeTab = 'flags'"
+                        :class="activeTab === 'flags' ? 'border-accent text-accent' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors">
+                    <svg class="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    Flags
+                    {% if flags and flags|length > 0 %}
+                    <span class="ml-1 px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-800">
+                        {{ flags|selectattr('status.value', 'equalto', 'open')|list|length }}
+                    </span>
+                    {% endif %}
+                </button>
+                <button @click="activeTab = 'requests'"
+                        :class="activeTab === 'requests' ? 'border-accent text-accent' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors">
+                    <svg class="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Requests
+                    {% if requests and requests|length > 0 %}
+                    <span class="ml-1 px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">
+                        {{ requests|selectattr('status.value', 'equalto', 'pending')|list|length }}
+                    </span>
+                    {% endif %}
+                </button>
+            </nav>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="p-6">
+            <!-- P&L Workings Tab -->
+            <div x-show="activeTab === 'workings'" x-cloak>
+                {% if workings %}
+                <div class="space-y-6">
+                    <!-- Income Section -->
+                    <div class="border border-gray-200 rounded-lg overflow-hidden">
+                        <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-green-100 rounded-lg">
+                                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900">Income</h3>
+                                    <p class="text-sm text-gray-600">Total: ${{ "%.2f"|format(workings.total_income or 0) }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-6">
+                            {% if workings.income_workings %}
+                            <div class="space-y-4">
+                                {% for key, item in workings.income_workings.items() %}
+                                {% if item and item is mapping %}
+                                <div class="border border-gray-200 rounded-lg p-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div>
+                                            <h4 class="font-medium text-gray-900">{{ item.display_name if item.display_name else key|replace('_', ' ')|title }}</h4>
+                                            <p class="text-xs text-gray-500">Source: {{ item.source if item.source else 'Unknown' }}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-lg font-semibold text-green-600">${{ "%.2f"|format((item.gross_amount|default(0))|float) }}</div>
+                                            <span class="px-2 py-0.5 rounded text-xs font-medium
+                                                {% if item.verification_status == 'verified' %}bg-green-100 text-green-700
+                                                {% elif item.verification_status == 'needs_review' %}bg-yellow-100 text-yellow-700
+                                                {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                                {{ item.verification_status|replace('_', ' ')|title if item.verification_status else 'Unverified' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <!-- Calculation Logic -->
+                                    {% if item.calculation_logic %}
+                                    <details class="mt-3 bg-blue-50 rounded-lg p-3">
+                                        <summary class="text-sm font-medium text-blue-800 cursor-pointer hover:text-blue-900">
+                                            View Calculation Logic
+                                        </summary>
+                                        <div class="mt-3 space-y-3 text-sm">
+                                            <!-- Primary Source -->
+                                            <div class="flex items-start gap-2">
+                                                <span class="px-2 py-0.5 bg-blue-200 text-blue-800 rounded font-mono text-xs">{{ item.calculation_logic.primary_source_code if item.calculation_logic.primary_source_code else item.source_code|default('BS') }}</span>
+                                                <span class="text-gray-700">{{ item.calculation_logic.primary_source_name if item.calculation_logic.primary_source_name else item.source }}</span>
+                                            </div>
+
+                                            <!-- Calculation Method -->
+                                            {% if item.calculation_logic.calculation_method %}
+                                            <div>
+                                                <span class="font-medium text-gray-600">Method:</span>
+                                                <span class="text-gray-800">{{ item.calculation_logic.calculation_method }}</span>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Formula -->
+                                            {% if item.calculation_logic.formula %}
+                                            <div class="bg-gray-50 rounded p-2 border border-gray-200">
+                                                <span class="font-medium text-gray-600 text-xs">Formula:</span>
+                                                <code class="ml-2 font-mono text-xs text-gray-800 bg-white px-1 rounded">{{ item.calculation_logic.formula }}</code>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Source References -->
+                                            {% if item.calculation_logic.source_references and item.calculation_logic.source_references|length > 0 %}
+                                            <div class="bg-white rounded p-2 border border-blue-100">
+                                                <div class="font-medium text-gray-600 mb-2 text-xs">Source Documents:</div>
+                                                <div class="space-y-1.5">
+                                                    {% for ref in item.calculation_logic.source_references %}
+                                                    <div class="flex items-center justify-between text-xs bg-gray-50 p-1.5 rounded">
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-mono text-xs">{{ ref.source_code }}</span>
+                                                            <span class="text-gray-700">{{ ref.document_name }}</span>
+                                                            {% if ref.line_reference %}
+                                                            <span class="text-gray-400">({{ ref.line_reference }})</span>
+                                                            {% endif %}
+                                                        </div>
+                                                        {% if ref.amount %}
+                                                        <span class="font-mono text-gray-800">${{ "%.2f"|format(ref.amount|float) }}</span>
+                                                        {% endif %}
+                                                    </div>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Calculation Steps -->
+                                            {% if item.calculation_logic.calculation_steps %}
+                                            <div class="bg-white rounded p-2 border border-blue-100">
+                                                <div class="font-medium text-gray-600 mb-1">Calculation Steps:</div>
+                                                <ul class="space-y-1 font-mono text-xs text-gray-700">
+                                                    {% for step in item.calculation_logic.calculation_steps %}
+                                                    <li class="flex items-start gap-2">
+                                                        <span class="text-blue-400">→</span>
+                                                        <span>{{ step }}</span>
+                                                    </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Adjustments -->
+                                            {% if item.calculation_logic.adjustments and item.calculation_logic.adjustments|length > 0 %}
+                                            <div class="bg-yellow-50 rounded p-2 border border-yellow-200">
+                                                <div class="font-medium text-yellow-800 mb-1 text-xs">Adjustments Applied:</div>
+                                                <ul class="space-y-1 text-xs">
+                                                    {% for adj in item.calculation_logic.adjustments %}
+                                                    <li class="flex items-center justify-between">
+                                                        <span class="text-gray-700">{{ adj.description }}</span>
+                                                        <span class="font-mono {% if adj.amount < 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                                                            {{ "+" if adj.amount > 0 else "" }}${{ "%.2f"|format(adj.amount|float) }}
+                                                        </span>
+                                                    </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Cross-validation -->
+                                            {% if item.calculation_logic.cross_validated_with %}
+                                            <div class="bg-gray-50 rounded p-2 border border-gray-200">
+                                                <div class="flex items-center gap-2 mb-1">
+                                                    {% if item.calculation_logic.validation_status == 'matched' %}
+                                                    <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">✓ Validated</span>
+                                                    {% elif item.calculation_logic.validation_status == 'variance' %}
+                                                    <span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">⚠ Variance</span>
+                                                    {% else %}
+                                                    <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">Not validated</span>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="text-gray-600 text-xs">Cross-checked with: {{ item.calculation_logic.cross_validated_with|join(', ') }}</div>
+                                                {% if item.calculation_logic.variance_amount %}
+                                                <div class="text-yellow-700 text-xs mt-1">
+                                                    Variance: ${{ "%.2f"|format(item.calculation_logic.variance_amount|float) }}
+                                                    {% if item.calculation_logic.variance_notes %}
+                                                    <span class="text-gray-500">- {{ item.calculation_logic.variance_notes }}</span>
+                                                    {% endif %}
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Applied Learnings -->
+                                            {% if item.calculation_logic.applied_learnings %}
+                                            <div class="mt-3 bg-purple-50 rounded p-2 border border-purple-200">
+                                                <div class="flex items-center gap-2 mb-2">
+                                                    <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                                    </svg>
+                                                    <span class="text-xs font-medium text-purple-800">Applied Learnings</span>
+                                                </div>
+                                                <ul class="space-y-1 text-xs text-purple-700">
+                                                    {% for learning in item.calculation_logic.applied_learnings %}
+                                                    <li class="flex items-start gap-1">
+                                                        <span class="text-purple-400">•</span>
+                                                        <span>{{ learning }}</span>
+                                                    </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Action Buttons -->
+                                            <div class="mt-3 pt-3 border-t border-blue-200 flex justify-end gap-2">
+                                                <button @click="confirmCalculation('income', '{{ key }}', '{{ item.display_name if item.display_name else key|replace('_', ' ')|title }}', {{ item.gross_amount|default(0) }}, $event)"
+                                                        :class="confirmedItems['income_{{ key }}'] ? 'bg-green-500 text-white cursor-default' : 'bg-green-100 text-green-700 hover:bg-green-200'"
+                                                        :disabled="confirmedItems['income_{{ key }}'] || confirmingItem === 'income_{{ key }}'"
+                                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-75">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                    <span x-text="confirmedItems['income_{{ key }}'] ? 'Confirmed' : 'Confirm Correct'"></span>
+                                                </button>
+                                                <button @click="openFeedbackModal('income', '{{ key }}', '{{ item.display_name if item.display_name else key|replace('_', ' ')|title }}')"
+                                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+                                                    </svg>
+                                                    Give Feedback
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </details>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-gray-500 text-sm">No income data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Expenses Section -->
+                    <div class="border border-gray-200 rounded-lg overflow-hidden">
+                        <div class="bg-gradient-to-r from-red-50 to-rose-50 px-6 py-4 border-b border-gray-200">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-red-100 rounded-lg">
+                                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900">Expenses</h3>
+                                    <p class="text-sm text-gray-600">Total: ${{ "%.2f"|format(workings.total_expenses or 0) }} | Deductible: ${{ "%.2f"|format(workings.total_deductions or 0) }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-6">
+                            {% if workings.expense_workings %}
+                            <div class="space-y-4">
+                                {% for key, item in workings.expense_workings.items() %}
+                                {% if item and item is mapping and key not in ['total_expenses_gross', 'total_deductions'] %}
+                                <div class="border border-gray-200 rounded-lg p-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div>
+                                            <h4 class="font-medium text-gray-900">{{ item.display_name if item.display_name else key|replace('_', ' ')|title }}</h4>
+                                            <p class="text-xs text-gray-500">Source: {{ item.source if item.source else 'Unknown' }}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-lg font-semibold text-red-600">${{ "%.2f"|format((item.gross_amount|default(0))|float|abs) }}</div>
+                                            {% if item.deductible_percentage and item.deductible_percentage < 100 %}
+                                            <div class="text-xs text-gray-500">{{ "%.0f"|format(item.deductible_percentage) }}% deductible = ${{ "%.2f"|format((item.deductible_amount|default(0))|float|abs) }}</div>
+                                            {% endif %}
+                                            <span class="px-2 py-0.5 rounded text-xs font-medium
+                                                {% if item.verification_status == 'verified' %}bg-green-100 text-green-700
+                                                {% elif item.verification_status == 'needs_review' %}bg-yellow-100 text-yellow-700
+                                                {% elif item.verification_status == 'missing_invoice' %}bg-orange-100 text-orange-700
+                                                {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                                {{ item.verification_status|replace('_', ' ')|title if item.verification_status else 'Unverified' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <!-- Calculation Logic -->
+                                    {% if item.calculation_logic %}
+                                    <details class="mt-3 bg-red-50 rounded-lg p-3">
+                                        <summary class="text-sm font-medium text-red-800 cursor-pointer hover:text-red-900">
+                                            View Calculation Logic
+                                        </summary>
+                                        <div class="mt-3 space-y-3 text-sm">
+                                            <!-- Primary Source -->
+                                            <div class="flex items-start gap-2">
+                                                <span class="px-2 py-0.5 bg-red-200 text-red-800 rounded font-mono text-xs">{{ item.calculation_logic.primary_source_code if item.calculation_logic.primary_source_code else item.source_code|default('BS') }}</span>
+                                                <span class="text-gray-700">{{ item.calculation_logic.primary_source_name if item.calculation_logic.primary_source_name else item.source }}</span>
+                                            </div>
+
+                                            <!-- Calculation Method -->
+                                            {% if item.calculation_logic.calculation_method %}
+                                            <div>
+                                                <span class="font-medium text-gray-600">Method:</span>
+                                                <span class="text-gray-800">{{ item.calculation_logic.calculation_method }}</span>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Formula -->
+                                            {% if item.calculation_logic.formula %}
+                                            <div class="bg-gray-50 rounded p-2 border border-gray-200">
+                                                <span class="font-medium text-gray-600 text-xs">Formula:</span>
+                                                <code class="ml-2 font-mono text-xs text-gray-800 bg-white px-1 rounded">{{ item.calculation_logic.formula }}</code>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Source References -->
+                                            {% if item.calculation_logic.source_references and item.calculation_logic.source_references|length > 0 %}
+                                            <div class="bg-white rounded p-2 border border-red-100">
+                                                <div class="font-medium text-gray-600 mb-2 text-xs">Source Documents:</div>
+                                                <div class="space-y-1.5">
+                                                    {% for ref in item.calculation_logic.source_references %}
+                                                    <div class="flex items-center justify-between text-xs bg-gray-50 p-1.5 rounded">
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="px-1.5 py-0.5 bg-red-100 text-red-700 rounded font-mono text-xs">{{ ref.source_code }}</span>
+                                                            <span class="text-gray-700">{{ ref.document_name }}</span>
+                                                            {% if ref.line_reference %}
+                                                            <span class="text-gray-400">({{ ref.line_reference }})</span>
+                                                            {% endif %}
+                                                        </div>
+                                                        {% if ref.amount %}
+                                                        <span class="font-mono text-gray-800">${{ "%.2f"|format(ref.amount|float) }}</span>
+                                                        {% endif %}
+                                                    </div>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Calculation Steps -->
+                                            {% if item.calculation_logic.calculation_steps %}
+                                            <div class="bg-white rounded p-2 border border-red-100">
+                                                <div class="font-medium text-gray-600 mb-1">Calculation Steps:</div>
+                                                <ul class="space-y-1 font-mono text-xs text-gray-700">
+                                                    {% for step in item.calculation_logic.calculation_steps %}
+                                                    <li class="flex items-start gap-2">
+                                                        <span class="text-red-400">→</span>
+                                                        <span>{{ step }}</span>
+                                                    </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Adjustments -->
+                                            {% if item.calculation_logic.adjustments and item.calculation_logic.adjustments|length > 0 %}
+                                            <div class="bg-yellow-50 rounded p-2 border border-yellow-200">
+                                                <div class="font-medium text-yellow-800 mb-1 text-xs">Adjustments Applied:</div>
+                                                <ul class="space-y-1 text-xs">
+                                                    {% for adj in item.calculation_logic.adjustments %}
+                                                    <li class="flex items-center justify-between">
+                                                        <span class="text-gray-700">{{ adj.description }}</span>
+                                                        <span class="font-mono {% if adj.amount < 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                                                            {{ "+" if adj.amount > 0 else "" }}${{ "%.2f"|format(adj.amount|float) }}
+                                                        </span>
+                                                    </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Cross-validation -->
+                                            {% if item.calculation_logic.cross_validated_with %}
+                                            <div class="bg-gray-50 rounded p-2 border border-gray-200">
+                                                <div class="flex items-center gap-2 mb-1">
+                                                    {% if item.calculation_logic.validation_status == 'matched' %}
+                                                    <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">✓ Validated</span>
+                                                    {% elif item.calculation_logic.validation_status == 'variance' %}
+                                                    <span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">⚠ Variance</span>
+                                                    {% else %}
+                                                    <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">Not validated</span>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="text-gray-600 text-xs">Cross-checked with: {{ item.calculation_logic.cross_validated_with|join(', ') }}</div>
+                                                {% if item.calculation_logic.variance_amount %}
+                                                <div class="text-yellow-700 text-xs mt-1">
+                                                    Variance: ${{ "%.2f"|format(item.calculation_logic.variance_amount|float) }}
+                                                    {% if item.calculation_logic.variance_notes %}
+                                                    <span class="text-gray-500">- {{ item.calculation_logic.variance_notes }}</span>
+                                                    {% endif %}
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Applied Learnings -->
+                                            {% if item.calculation_logic.applied_learnings %}
+                                            <div class="mt-3 bg-purple-50 rounded p-2 border border-purple-200">
+                                                <div class="flex items-center gap-2 mb-2">
+                                                    <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                                    </svg>
+                                                    <span class="text-xs font-medium text-purple-800">Applied Learnings</span>
+                                                </div>
+                                                <ul class="space-y-1 text-xs text-purple-700">
+                                                    {% for learning in item.calculation_logic.applied_learnings %}
+                                                    <li class="flex items-start gap-1">
+                                                        <span class="text-purple-400">•</span>
+                                                        <span>{{ learning }}</span>
+                                                    </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Action Buttons -->
+                                            <div class="mt-3 pt-3 border-t border-red-200 flex justify-end gap-2">
+                                                <button @click="confirmCalculation('expense', '{{ key }}', '{{ item.display_name if item.display_name else key|replace('_', ' ')|title }}', {{ item.gross_amount|default(0) }}, $event)"
+                                                        :class="confirmedItems['expense_{{ key }}'] ? 'bg-green-500 text-white cursor-default' : 'bg-green-100 text-green-700 hover:bg-green-200'"
+                                                        :disabled="confirmedItems['expense_{{ key }}'] || confirmingItem === 'expense_{{ key }}'"
+                                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-75">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                    <span x-text="confirmedItems['expense_{{ key }}'] ? 'Confirmed' : 'Confirm Correct'"></span>
+                                                </button>
+                                                <button @click="openFeedbackModal('expense', '{{ key }}', '{{ item.display_name if item.display_name else key|replace('_', ' ')|title }}')"
+                                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+                                                    </svg>
+                                                    Give Feedback
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </details>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-gray-500 text-sm">No expense data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Processing Notes -->
+                    {% if workings.processing_notes %}
+                    <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Processing Notes</h3>
+                        <ul class="space-y-2">
+                            {% for note in workings.processing_notes %}
+                            <li class="flex items-start">
+                                <span class="text-gray-400 mr-2">-</span>
+                                <span class="text-sm text-gray-600">{{ note }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <!-- No Workings Yet -->
+                <div class="text-center py-12">
+                    <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <h3 class="mt-4 text-lg font-medium text-gray-900">No Workings Generated Yet</h3>
+                    <p class="mt-2 text-sm text-gray-500">Click "Generate Workings" to process this tax return with the AI Brain.</p>
+                </div>
+                {% endif %}
+            </div>
+            <!-- Flags Tab -->
+            <div x-show="activeTab === 'flags'" x-cloak>
+                {% if flags and flags|length > 0 %}
+                <div class="space-y-4">
+                    {% for flag in flags %}
+                    <div class="border border-gray-200 rounded-lg p-4 {{ 'bg-green-50' if flag.status.value == 'resolved' else 'hover:bg-gray-50' }}">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center
+                                    {% if flag.severity.value == 'high' %}bg-red-100
+                                    {% elif flag.severity.value == 'medium' %}bg-yellow-100
+                                    {% else %}bg-blue-100{% endif %}">
+                                    <svg class="w-5 h-5
+                                        {% if flag.severity.value == 'high' %}text-red-600
+                                        {% elif flag.severity.value == 'medium' %}text-yellow-600
+                                        {% else %}text-blue-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="px-2 py-0.5 rounded text-xs font-medium
+                                        {% if flag.severity.value == 'high' %}bg-red-100 text-red-700
+                                        {% elif flag.severity.value == 'medium' %}bg-yellow-100 text-yellow-700
+                                        {% else %}bg-blue-100 text-blue-700{% endif %}">
+                                        {{ flag.severity.value|upper }}
+                                    </span>
+                                    <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                                        {{ flag.category.value|replace('_', ' ')|title }}
+                                    </span>
+                                    {% if flag.status.value == 'resolved' %}
+                                    <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">Resolved</span>
+                                    {% endif %}
+                                </div>
+                                <p class="text-sm font-medium text-gray-900">{{ flag.message }}</p>
+                                {% if flag.action_required %}
+                                <p class="text-xs text-gray-600 mt-1">Action: {{ flag.action_required }}</p>
+                                {% endif %}
+                                {% if flag.related_amount %}
+                                <p class="text-xs text-gray-500 mt-1">Amount: ${{ "%.2f"|format(flag.related_amount) }}</p>
+                                {% endif %}
+                            </div>
+                            {% if flag.status.value == 'open' %}
+                            <div class="flex-shrink-0">
+                                <button @click="resolveFlag('{{ flag.id }}')"
+                                        class="px-3 py-1.5 text-xs font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200">
+                                    Resolve
+                                </button>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-12">
+                    <svg class="mx-auto h-16 w-16 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <h3 class="mt-4 text-lg font-medium text-gray-900">No Flags</h3>
+                    <p class="mt-2 text-sm text-gray-500">All items have been reviewed successfully.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Document Requests Tab -->
+            <div x-show="activeTab === 'requests'" x-cloak>
+                {% if requests and requests|length > 0 %}
+                <div class="space-y-4">
+                    {% for req in requests %}
+                    <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="font-medium text-gray-900">{{ req.document_type|replace('_', ' ')|title }}</span>
+                                    <span class="px-2 py-0.5 rounded text-xs font-medium
+                                        {% if req.priority == 'required' %}bg-red-100 text-red-700
+                                        {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                        {{ req.priority|title }}
+                                    </span>
+                                    <span class="px-2 py-0.5 rounded text-xs font-medium
+                                        {% if req.status.value == 'received' %}bg-green-100 text-green-700
+                                        {% elif req.status.value == 'sent' %}bg-blue-100 text-blue-700
+                                        {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                        {{ req.status.value|title }}
+                                    </span>
+                                </div>
+                                <p class="text-sm text-gray-600">{{ req.reason }}</p>
+                                {% if req.details %}
+                                <p class="text-xs text-gray-500 mt-1">{{ req.details }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% elif questions and questions|length > 0 %}
+                <div class="mb-8">
+                    <h4 class="text-lg font-medium text-gray-900 mb-4">Client Questions</h4>
+                    <div class="space-y-4">
+                        {% for q in questions %}
+                        <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-grow">
+                                    <p class="font-medium text-gray-900">{{ q.question }}</p>
+                                    {% if q.context %}
+                                    <p class="text-sm text-gray-600 mt-1">{{ q.context }}</p>
+                                    {% endif %}
+                                    {% if q.answer %}
+                                    <div class="mt-2 p-2 bg-green-50 rounded text-sm text-green-800">
+                                        <strong>Answer:</strong> {{ q.answer }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <span class="px-2 py-0.5 rounded text-xs font-medium
+                                    {% if q.status.value == 'answered' %}bg-green-100 text-green-700
+                                    {% elif q.status.value == 'sent' %}bg-blue-100 text-blue-700
+                                    {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                    {{ q.status.value|title }}
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-12">
+                    <svg class="mx-auto h-16 w-16 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <h3 class="mt-4 text-lg font-medium text-gray-900">No Document Requests</h3>
+                    <p class="mt-2 text-sm text-gray-500">All required documents have been received.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+<!-- Toast Notification -->
+<div id="toast" class="hidden fixed bottom-4 right-4 z-50">
+    <div class="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        <span id="toastMessage"></span>
+    </div>
+</div>
+
+<!-- Calculation Feedback Modal -->
+<div x-show="showFeedbackModal" x-cloak
+     class="fixed inset-0 z-50 overflow-y-auto"
+     @keydown.escape.window="closeFeedbackModal()">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closeFeedbackModal()"></div>
+
+        <div class="relative bg-white rounded-lg shadow-xl max-w-lg w-full overflow-hidden"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 transform scale-95"
+             x-transition:enter-end="opacity-100 transform scale-100">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                        Teach the AI
+                    </h3>
+                    <button @click="closeFeedbackModal()" class="text-white/80 hover:text-white">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-purple-100 text-sm mt-1">
+                    Feedback for: <span class="font-medium text-white" x-text="feedbackItemName"></span>
+                </p>
+            </div>
+
+            <!-- Content -->
+            <div class="px-6 py-4">
+                <div class="space-y-4">
+                    <!-- Feedback Type -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">What type of feedback?</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" @click="feedbackType = 'correction'"
+                                    :class="feedbackType === 'correction' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'"
+                                    class="px-3 py-2 border rounded-lg text-sm font-medium transition-colors">
+                                Correction
+                            </button>
+                            <button type="button" @click="feedbackType = 'teaching'"
+                                    :class="feedbackType === 'teaching' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'"
+                                    class="px-3 py-2 border rounded-lg text-sm font-medium transition-colors">
+                                Teaching/Rule
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Feedback Content -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            <span x-show="feedbackType === 'correction'">What should be different?</span>
+                            <span x-show="feedbackType === 'teaching'">What rule should the AI learn?</span>
+                        </label>
+                        <textarea x-model="feedbackContent" rows="4"
+                                  class="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm"
+                                  :placeholder="feedbackType === 'correction' ? 'e.g., The interest amount should be calculated differently because...' : 'e.g., For new builds with CCC after March 2020, interest is 100% deductible...'"></textarea>
+                    </div>
+
+                    <!-- Expected Value (for corrections) -->
+                    <div x-show="feedbackType === 'correction'" x-cloak>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Expected Value (optional)</label>
+                        <div class="flex items-center gap-2">
+                            <span class="text-gray-500">$</span>
+                            <input type="number" step="0.01" x-model="feedbackExpectedValue"
+                                   class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 text-sm"
+                                   placeholder="Enter correct amount">
+                        </div>
+                    </div>
+
+                    <!-- Recalculate Options -->
+                    <div class="pt-2 space-y-2">
+                        <label class="text-sm font-medium text-gray-700">After saving:</label>
+                        <div class="space-y-2 pl-2">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" x-model="feedbackRecalculateMode" value="none"
+                                       class="text-purple-600 focus:ring-purple-500">
+                                <span class="text-sm text-gray-700">Save learning only (no recalculation)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" x-model="feedbackRecalculateMode" value="item"
+                                       class="text-purple-600 focus:ring-purple-500">
+                                <span class="text-sm text-gray-700">Recalculate this item only</span>
+                                <span class="text-xs text-green-600 font-medium">(AI uses learnings)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" x-model="feedbackRecalculateMode" value="full"
+                                       class="text-purple-600 focus:ring-purple-500">
+                                <span class="text-sm text-gray-700">Recalculate entire P&L</span>
+                                <span class="text-xs text-gray-500">(Slower)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="bg-gray-50 px-6 py-4 flex justify-between items-center">
+                <button @click="viewAllLearnings()"
+                        class="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                    View All Learnings
+                </button>
+                <div class="flex gap-3">
+                    <button @click="closeFeedbackModal()"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button @click="submitFeedback()"
+                            :disabled="!feedbackContent || submittingFeedback"
+                            class="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                        <svg x-show="submittingFeedback" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span x-text="submittingFeedback ? 'Saving...' : 'Save & Learn'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Learnings Viewer Modal -->
+<div x-show="showLearningsModal" x-cloak
+     class="fixed inset-0 z-50 overflow-y-auto"
+     @keydown.escape.window="showLearningsModal = false">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="showLearningsModal = false"></div>
+
+        <div class="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                        </svg>
+                        AI Learnings
+                    </h3>
+                    <button @click="showLearningsModal = false" class="text-white/80 hover:text-white">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="px-6 py-4 overflow-y-auto max-h-[60vh]">
+                <div x-show="loadingLearnings" class="flex justify-center py-8">
+                    <svg class="animate-spin w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+
+                <div x-show="!loadingLearnings && learningsList.length === 0" class="text-center py-8">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                    <p class="mt-2 text-gray-500">No learnings yet. Give feedback to teach the AI!</p>
+                </div>
+
+                <div x-show="!loadingLearnings && learningsList.length > 0" class="space-y-3">
+                    <template x-for="learning in learningsList" :key="learning.id">
+                        <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="px-2 py-0.5 rounded text-xs font-medium"
+                                              :class="learning.learning_type === 'correction' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'"
+                                              x-text="learning.learning_type"></span>
+                                        <span class="text-xs text-gray-500" x-text="learning.created_at"></span>
+                                    </div>
+                                    <h4 class="font-medium text-gray-900" x-text="learning.title"></h4>
+                                    <p class="text-sm text-gray-600 mt-1" x-text="learning.content"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="bg-gray-50 px-6 py-4 flex justify-end">
+                <button @click="showLearningsModal = false"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- P&L Processing Progress Modal -->
+<div x-show="showProcessingModal" x-cloak
+     class="fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+
+        <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <!-- Header -->
+            <div class="text-center mb-6">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-accent/10 mb-4">
+                    <svg class="animate-spin h-6 w-6 text-accent" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900">Processing P&L Workings</h3>
+                <p class="mt-1 text-sm text-gray-500" x-text="processingMessage">Please wait...</p>
+            </div>
+
+            <!-- Progress Steps -->
+            <div class="space-y-4">
+                <template x-for="(step, index) in processingSteps" :key="step.key">
+                    <div class="flex items-center">
+                        <!-- Step Icon -->
+                        <div class="flex-shrink-0">
+                            <div :class="{
+                                'bg-accent': processingSteps.findIndex(s => s.key === processingStage) > index,
+                                'bg-accent animate-pulse': processingStage === step.key,
+                                'bg-gray-200': processingSteps.findIndex(s => s.key === processingStage) < index
+                            }" class="w-8 h-8 rounded-full flex items-center justify-center">
+                                <!-- Completed checkmark -->
+                                <template x-if="processingSteps.findIndex(s => s.key === processingStage) > index">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                </template>
+                                <!-- Current spinning icon -->
+                                <template x-if="processingStage === step.key">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="step.icon"></path>
+                                    </svg>
+                                </template>
+                                <!-- Pending dot -->
+                                <template x-if="processingSteps.findIndex(s => s.key === processingStage) < index">
+                                    <div class="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                </template>
+                            </div>
+                        </div>
+                        <!-- Step Label -->
+                        <div class="ml-4 flex-1">
+                            <p :class="{
+                                'text-accent font-medium': processingSteps.findIndex(s => s.key === processingStage) >= index,
+                                'text-gray-400': processingSteps.findIndex(s => s.key === processingStage) < index
+                            }" class="text-sm" x-text="step.label"></p>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="mt-6">
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-accent h-2 rounded-full transition-all duration-500"
+                         :style="{ width: ((processingSteps.findIndex(s => s.key === processingStage) + 1) / processingSteps.length * 100) + '%' }">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cancel Button -->
+            <div class="mt-6 text-center">
+                <button @click="cancelProcessing()"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div><!-- End of Alpine.js x-data container -->
+
+<script>
+function formatCurrency(amount) {
+    return '$' + parseFloat(amount || 0).toLocaleString('en-NZ', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toastMessage');
+    const toastDiv = toast.querySelector('div');
+
+    toastMessage.textContent = message;
+    toastDiv.classList.remove('bg-green-500', 'bg-red-500', 'bg-blue-500');
+
+    if (type === 'error') {
+        toastDiv.classList.add('bg-red-500');
+    } else if (type === 'info') {
+        toastDiv.classList.add('bg-blue-500');
+    } else {
+        toastDiv.classList.add('bg-green-500');
+    }
+
+    toast.classList.remove('hidden');
+    // Info messages stay longer since they indicate ongoing operations
+    const duration = type === 'info' ? 5000 : 3000;
+    setTimeout(() => toast.classList.add('hidden'), duration);
+}
+
+function unifiedWorkings() {
+    return {
+        activeTab: 'workings',
+        processing: false,
+        generatingWorkbook: false,
+        workbookReady: false,
+        workbookUrl: '',
+        saving: false,
+        refreshing: false,
+
+        // Summary card values
+        totalIncome: {{ workings.total_income or 0 if workings else 0 }},
+        interestExpense: {{ workings.interest_deductible_amount or 0 if workings else 0 }},
+        otherExpenses: {{ ((workings.total_deductions or 0) - (workings.interest_deductible_amount or 0)) if workings else 0 }},
+        totalDeductions: {{ workings.total_deductions or 0 if workings else 0 }},
+        netRentalIncome: {{ workings.net_rental_income or 0 if workings else 0 }},
+        needsReviewCount: {{ open_flags_count|default(0) }},
+        transactionNeedsReviewCount: {{ transaction_needs_review_count|default(0) }},
+
+        // Feedback modal state
+        showFeedbackModal: false,
+        feedbackType: 'correction',
+        feedbackCategory: '',
+        feedbackItemKey: '',
+        feedbackItemName: '',
+        feedbackContent: '',
+        feedbackExpectedValue: '',
+        feedbackRecalculateMode: 'item',  // 'none', 'item', or 'full'
+        submittingFeedback: false,
+
+        // Learnings modal state
+        showLearningsModal: false,
+        loadingLearnings: false,
+        learningsList: [],
+
+        // P&L Processing progress modal state
+        showProcessingModal: false,
+        processingStage: '',
+        processingMessage: '',
+        processingAbortController: null,
+        processingSteps: [
+            { key: 'extracting', label: 'Extracting Transactions', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+            { key: 'categorizing', label: 'Categorizing Items', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z' },
+            { key: 'calculating', label: 'Calculating P&L', icon: 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
+            { key: 'finalizing', label: 'Finalizing Workings', icon: 'M5 13l4 4L19 7' }
+        ],
+
+        taxReturnId: '{{ tax_return.id }}',
+
+        formatCurrency(amount) {
+            return '$' + parseFloat(amount || 0).toLocaleString('en-NZ', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        },
+
+        // Refresh summary data from API
+        async refreshSummary() {
+            this.refreshing = true;
+            try {
+                // Fetch updated workings data - this is the source of truth after processing
+                const response = await fetch(`/api/workings/${this.taxReturnId}`);
+                let hasWorkings = false;
+
+                if (response.ok) {
+                    const data = await response.json();
+                    hasWorkings = true;
+
+                    // Use workings data as the source of truth (data is nested under 'summary')
+                    const summary = data.summary || data;
+                    this.totalIncome = parseFloat(summary.total_income || 0);
+                    this.interestExpense = parseFloat(summary.interest_deductible_amount || 0);
+                    this.totalDeductions = parseFloat(summary.total_deductions || 0);
+                    this.otherExpenses = this.totalDeductions - this.interestExpense;
+                    this.netRentalIncome = parseFloat(summary.net_rental_income || 0);
+
+                    // Count open flags
+                    const flagsResponse = await fetch(`/api/workings/${this.taxReturnId}/flags`);
+                    if (flagsResponse.ok) {
+                        const flagsData = await flagsResponse.json();
+                        const flags = flagsData.flags || flagsData || [];
+                        this.needsReviewCount = flags.filter(f => f.status === 'open').length;
+                    }
+                }
+
+                // Fetch transaction totals - only for needs_review count, don't overwrite P&L values
+                const txnResponse = await fetch(`/api/transactions/totals/${this.taxReturnId}`);
+                if (txnResponse.ok) {
+                    const txnData = await txnResponse.json();
+
+                    // Only use transaction totals if workings don't exist yet
+                    if (!hasWorkings) {
+                        if (txnData.total_income !== undefined) {
+                            this.totalIncome = parseFloat(txnData.total_income || 0);
+                        }
+                        if (txnData.total_deductible !== undefined) {
+                            this.totalDeductions = parseFloat(txnData.total_deductible || 0);
+                        }
+                        if (txnData.interest_expense !== undefined) {
+                            this.interestExpense = parseFloat(txnData.interest_expense || 0);
+                        }
+                        if (txnData.net_rental_income !== undefined) {
+                            this.netRentalIncome = parseFloat(txnData.net_rental_income || 0);
+                        }
+                        this.otherExpenses = this.totalDeductions - this.interestExpense;
+                    }
+
+                    // Always update transaction review count from transaction data
+                    if (txnData.needs_review_count !== undefined) {
+                        this.transactionNeedsReviewCount = txnData.needs_review_count;
+                    }
+                }
+
+                showToast('Summary updated');
+            } catch (e) {
+                console.error('Error refreshing summary:', e);
+            } finally {
+                this.refreshing = false;
+            }
+        },
+
+        async processWorkings() {
+            this.processing = true;
+            this.showProcessingModal = true;
+            this.processingStage = 'extracting';
+            this.processingMessage = 'Reading transactions from documents...';
+
+            // Create AbortController for cancellation
+            this.processingAbortController = new AbortController();
+
+            try {
+                // Progress through stages while API processes
+                const progressStages = [
+                    { stage: 'categorizing', message: 'Applying categorization rules...', delay: 1200 },
+                    { stage: 'calculating', message: 'Computing P&L totals...', delay: 1500 },
+                ];
+
+                // Start the API call with abort signal
+                const fetchPromise = fetch('/api/workings/{{ tax_return.id }}/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        force_reprocess: {{ 'true' if workings else 'false' }},
+                        process_transactions: true
+                    }),
+                    signal: this.processingAbortController.signal
+                });
+
+                // Progress through stages while waiting for API
+                for (const { stage, message, delay } of progressStages) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    if (this.processingAbortController.signal.aborted) return;
+                    this.processingStage = stage;
+                    this.processingMessage = message;
+                }
+
+                // Wait for API response
+                const response = await fetchPromise;
+
+                // Move to finalizing stage
+                this.processingStage = 'finalizing';
+                this.processingMessage = 'Saving workings...';
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                if (response.ok) {
+                    this.processingMessage = 'Complete! Refreshing...';
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    window.location.reload();
+                } else {
+                    const error = await response.json();
+                    this.showProcessingModal = false;
+                    showToast('Error: ' + (error.detail || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                // Don't show error toast if user cancelled
+                if (e.name === 'AbortError') {
+                    return;
+                }
+                this.showProcessingModal = false;
+                showToast('Error: ' + e.message, 'error');
+            } finally {
+                this.processing = false;
+                this.processingAbortController = null;
+            }
+        },
+
+        cancelProcessing() {
+            if (this.processingAbortController) {
+                this.processingAbortController.abort();
+            }
+            this.showProcessingModal = false;
+            this.processing = false;
+            this.processingAbortController = null;
+            showToast('Processing cancelled', 'info');
+        },
+
+        async generateWorkbook() {
+            this.generatingWorkbook = true;
+            showToast('Generating workbook...', 'info');
+            try {
+                const response = await fetch(`/api/transactions/workbook/${this.taxReturnId}?process_transactions=true`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    this.workbookUrl = data.download_url;
+                    this.workbookReady = true;
+                    showToast('Workbook generated successfully!');
+                    await this.refreshSummary();
+                } else {
+                    const error = await response.json();
+                    showToast('Error: ' + (error.detail || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                showToast('Error: ' + e.message, 'error');
+            } finally {
+                this.generatingWorkbook = false;
+            }
+        },
+
+        async resolveFlag(flagId) {
+            const notes = prompt('Resolution notes (optional):');
+            if (notes === null) return;
+
+            try {
+                const response = await fetch(`/api/workings/flags/${flagId}/resolve`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ resolution_notes: notes, resolved_by: 'User' })
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    const error = await response.json();
+                    alert('Error resolving flag: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        },
+
+        async toggleDocumentExclusion(docId, exclude, docName) {
+            const reason = exclude
+                ? prompt(`Why exclude "${docName}" from calculations?\n(e.g., "Duplicate data from property summary")`)
+                : null;
+
+            if (exclude && reason === null) return;
+
+            try {
+                const params = new URLSearchParams({ is_excluded: exclude });
+                if (reason) params.append('reason', reason);
+
+                const response = await fetch(`/api/documents/${docId}/exclude?${params.toString()}`, {
+                    method: 'PUT'
+                });
+
+                if (response.ok) {
+                    showToast(exclude ? `"${docName}" excluded` : `"${docName}" included`);
+                    location.reload();
+                } else {
+                    const error = await response.json();
+                    showToast(`Error: ${error.detail}`, 'error');
+                }
+            } catch (e) {
+                showToast('Error: ' + e.message, 'error');
+            }
+        },
+
+        async saveReviewedTransactions() {
+            this.saving = true;
+            try {
+                const response = await fetch(`/api/transactions/save-learnings/${this.taxReturnId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showToast(data.message || 'Learnings saved');
+                    this.manuallyReviewedCount = 0;
+                } else {
+                    showToast('Error saving learnings', 'error');
+                }
+            } catch (e) {
+                showToast('Error: ' + e.message, 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        // Confirmation state tracking
+        confirmedItems: {},
+        confirmingItem: null,
+
+        // Confirmation Function
+        async confirmCalculation(category, itemKey, itemName, amount, event) {
+            const confirmKey = `${category}_${itemKey}`;
+
+            // Prevent duplicate clicks
+            if (this.confirmingItem === confirmKey || this.confirmedItems[confirmKey]) {
+                return;
+            }
+
+            this.confirmingItem = confirmKey;
+
+            // Update button visually
+            const button = event?.target?.closest('button');
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = `
+                    <svg class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Confirming...</span>
+                `;
+            }
+
+            try {
+                const payload = {
+                    category: category,
+                    item_key: itemKey,
+                    item_name: itemName,
+                    confirmed_value: amount
+                };
+
+                const response = await fetch(`/api/workings/${this.taxReturnId}/confirm`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showToast(data.message || 'Calculation confirmed!');
+                    this.confirmedItems[confirmKey] = true;
+
+                    // Update button to show confirmed state
+                    if (button) {
+                        button.classList.remove('bg-green-100', 'text-green-700', 'hover:bg-green-200');
+                        button.classList.add('bg-green-500', 'text-white', 'cursor-default');
+                        button.innerHTML = `
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Confirmed</span>
+                        `;
+                    }
+                } else {
+                    const error = await response.json();
+                    showToast(error.detail || 'Error confirming calculation', 'error');
+                    // Reset button on error
+                    if (button) {
+                        button.disabled = false;
+                        button.innerHTML = `
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Confirm Correct</span>
+                        `;
+                    }
+                }
+            } catch (e) {
+                console.error('Error confirming calculation:', e);
+                showToast('Error: ' + e.message, 'error');
+                // Reset button on error
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = `
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Confirm Correct</span>
+                    `;
+                }
+            } finally {
+                this.confirmingItem = null;
+            }
+        },
+
+        // Feedback Modal Functions
+        openFeedbackModal(category, itemKey, itemName) {
+            this.feedbackCategory = category;
+            this.feedbackItemKey = itemKey;
+            this.feedbackItemName = itemName;
+            this.feedbackType = 'correction';
+            this.feedbackContent = '';
+            this.feedbackExpectedValue = '';
+            this.feedbackRecalculateMode = 'item';
+            this.showFeedbackModal = true;
+        },
+
+        closeFeedbackModal() {
+            this.showFeedbackModal = false;
+            this.feedbackContent = '';
+            this.feedbackExpectedValue = '';
+        },
+
+        async submitFeedback() {
+            if (!this.feedbackContent) return;
+
+            this.submittingFeedback = true;
+            try {
+                const payload = {
+                    category: this.feedbackCategory,
+                    item_key: this.feedbackItemKey,
+                    item_name: this.feedbackItemName,
+                    feedback_type: this.feedbackType,
+                    content: this.feedbackContent,
+                    expected_value: this.feedbackExpectedValue ? parseFloat(this.feedbackExpectedValue) : null,
+                    recalculate_mode: this.feedbackRecalculateMode  // 'none', 'item', or 'full'
+                };
+
+                const response = await fetch(`/api/workings/${this.taxReturnId}/feedback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showToast(data.message || 'Feedback saved and learned!');
+                    this.closeFeedbackModal();
+
+                    // If any recalculation was done, refresh the page
+                    if (data.recalculated) {
+                        const msg = this.feedbackRecalculateMode === 'item'
+                            ? `Recalculated ${this.feedbackItemName}`
+                            : 'Recalculated all workings';
+                        showToast(msg, 'info');
+                        setTimeout(() => window.location.reload(), 1500);
+                    }
+                } else {
+                    const error = await response.json();
+                    showToast(error.detail || 'Error saving feedback', 'error');
+                }
+            } catch (e) {
+                console.error('Error submitting feedback:', e);
+                showToast('Error: ' + e.message, 'error');
+            } finally {
+                this.submittingFeedback = false;
+            }
+        },
+
+        // Learnings Modal Functions
+        async viewAllLearnings() {
+            this.showLearningsModal = true;
+            this.loadingLearnings = true;
+            this.learningsList = [];
+
+            try {
+                const response = await fetch(`/api/workings/${this.taxReturnId}/learnings`);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.learningsList = data.learnings || [];
+                } else {
+                    showToast('Error loading learnings', 'error');
+                }
+            } catch (e) {
+                console.error('Error loading learnings:', e);
+                showToast('Error: ' + e.message, 'error');
+            } finally {
+                this.loadingLearnings = false;
+            }
+        },
+
+        async manualRefresh() {
+            await this.refreshSummary();
+        }
+    }
+}
+</script>
+{% endblock %}

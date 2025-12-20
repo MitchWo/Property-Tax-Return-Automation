@@ -1,0 +1,1 @@
+"""Prompt templates for NZ rental returns processing."""
