@@ -45,6 +45,37 @@ class TransactionProcessor:
         self.categorizer = TransactionCategorizer()
         self.tax_service = TaxRulesService()
 
+    def _apply_category_result(self, transaction: Transaction, category_result) -> None:
+        """Apply categorization result attributes to a transaction.
+
+        Handles both object and dict-like category results with safe attribute access.
+        """
+        transaction.category_code = category_result.category_code
+        transaction.gst_inclusive = getattr(category_result, 'gst_inclusive', False)
+        transaction.deductible_percentage = getattr(category_result, 'deductible_percentage', 100.0)
+        transaction.categorization_source = getattr(category_result, 'categorization_source', 'unknown')
+        transaction.categorization_trace = getattr(category_result, 'categorization_trace', None)
+        transaction.confidence = getattr(category_result, 'confidence', 0.0)
+        transaction.needs_review = getattr(category_result, 'needs_review', True)
+
+        # Truncate review_reason as safety fallback (even though DB now supports TEXT)
+        review_reason = getattr(category_result, 'review_reason', None)
+        if review_reason and len(review_reason) > 10000:  # Safety limit for extremely long text
+            review_reason = review_reason[:9997] + "..."
+        transaction.review_reason = review_reason
+
+    def _apply_tax_result(self, transaction: Transaction, tax_result) -> None:
+        """Apply tax rules result to a transaction.
+
+        Handles both dict and object tax results.
+        """
+        if isinstance(tax_result, dict):
+            transaction.deductible_percentage = tax_result.get('deductible_percentage', transaction.deductible_percentage)
+            transaction.gst_inclusive = tax_result.get('gst_inclusive', transaction.gst_inclusive)
+        else:
+            transaction.deductible_percentage = getattr(tax_result, 'deductible_percentage', transaction.deductible_percentage)
+            transaction.gst_inclusive = getattr(tax_result, 'gst_inclusive', transaction.gst_inclusive)
+
     async def process_document(
         self,
         db: AsyncSession,
@@ -172,31 +203,14 @@ class TransactionProcessor:
                     categorization_source='extraction'
                 )
 
-                # Update transaction with categorization (category_result is TransactionCreate object)
-                transaction.category_code = category_result.category_code
-                transaction.gst_inclusive = category_result.gst_inclusive if hasattr(category_result, 'gst_inclusive') else False
-                transaction.deductible_percentage = category_result.deductible_percentage if hasattr(category_result, 'deductible_percentage') else 100.0
-                transaction.categorization_source = category_result.categorization_source if hasattr(category_result, 'categorization_source') else 'unknown'
-                transaction.categorization_trace = category_result.categorization_trace if hasattr(category_result, 'categorization_trace') else None
-                transaction.confidence = category_result.confidence if hasattr(category_result, 'confidence') else 0.0
-                transaction.needs_review = category_result.needs_review if hasattr(category_result, 'needs_review') else True
-                # Truncate review_reason as safety fallback (even though DB now supports TEXT)
-                review_reason = category_result.review_reason if hasattr(category_result, 'review_reason') else None
-                if review_reason and len(review_reason) > 10000:  # Safety limit for extremely long text
-                    review_reason = review_reason[:9997] + "..."
-                transaction.review_reason = review_reason
+                # Apply categorization result
+                self._apply_category_result(transaction, category_result)
 
                 # Apply tax rules
                 tax_result = await self.tax_service.apply_tax_rules(
                     db, transaction, tax_return
                 )
-                # tax_result is likely a dict or object - handle both cases
-                if isinstance(tax_result, dict):
-                    transaction.deductible_percentage = tax_result.get('deductible_percentage', transaction.deductible_percentage)
-                    transaction.gst_inclusive = tax_result.get('gst_inclusive', transaction.gst_inclusive)
-                else:
-                    transaction.deductible_percentage = getattr(tax_result, 'deductible_percentage', transaction.deductible_percentage)
-                    transaction.gst_inclusive = getattr(tax_result, 'gst_inclusive', transaction.gst_inclusive)
+                self._apply_tax_result(transaction, tax_result)
 
                 db.add(transaction)
                 processed_transactions.append(transaction)
@@ -206,7 +220,7 @@ class TransactionProcessor:
 
             # Generate summary (currently returns list of per-category summaries)
             summaries = await self._generate_summary(db, tax_return_id)
-            # TODO: Decide how to handle multiple category summaries in ProcessingResult
+            # Note: ProcessingResult expects a single summary; using first if multiple exist
             summary = summaries[0] if summaries else None
 
             # Update document status
@@ -590,40 +604,22 @@ class TransactionProcessor:
                     db, extracted, tax_return
                 )
 
-                # Update transaction (category_result is TransactionCreate object)
-                transaction.category_code = category_result.category_code
-                transaction.gst_inclusive = category_result.gst_inclusive if hasattr(category_result, 'gst_inclusive') else False
-                transaction.deductible_percentage = category_result.deductible_percentage if hasattr(category_result, 'deductible_percentage') else 100.0
-                transaction.categorization_source = category_result.categorization_source if hasattr(category_result, 'categorization_source') else 'unknown'
-                transaction.categorization_trace = category_result.categorization_trace if hasattr(category_result, 'categorization_trace') else None
-                transaction.confidence = category_result.confidence if hasattr(category_result, 'confidence') else 0.0
-                transaction.needs_review = category_result.needs_review if hasattr(category_result, 'needs_review') else True
-                # Truncate review_reason as safety fallback
-                review_reason = category_result.review_reason if hasattr(category_result, 'review_reason') else None
-                if review_reason and len(review_reason) > 10000:  # Safety limit for extremely long text
-                    review_reason = review_reason[:9997] + "..."
-                transaction.review_reason = review_reason
+                # Apply categorization result
+                self._apply_category_result(transaction, category_result)
 
                 # Reapply tax rules
                 tax_result = await self.tax_service.apply_tax_rules(
                     db, transaction, tax_return
                 )
-                # tax_result is likely a dict or object - handle both cases
-                if isinstance(tax_result, dict):
-                    transaction.deductible_percentage = tax_result.get('deductible_percentage', transaction.deductible_percentage)
-                    transaction.gst_inclusive = tax_result.get('gst_inclusive', transaction.gst_inclusive)
-                else:
-                    transaction.deductible_percentage = getattr(tax_result, 'deductible_percentage', transaction.deductible_percentage)
-                    transaction.gst_inclusive = getattr(tax_result, 'gst_inclusive', transaction.gst_inclusive)
+                self._apply_tax_result(transaction, tax_result)
 
                 updated_transactions.append(transaction)
 
             # Commit updates
             await db.commit()
 
-            # Regenerate summary (currently returns list of per-category summaries)
+            # Regenerate summary
             summaries = await self._generate_summary(db, tax_return_id)
-            # TODO: Decide how to handle multiple category summaries in ProcessingResult
             summary = summaries[0] if summaries else None
 
             logger.info(f"Reprocessed {len(updated_transactions)} transactions")
@@ -825,7 +821,6 @@ class TransactionProcessor:
         transactions = result.scalars().all()
 
         summaries = await self._generate_summary(db, tax_return_id)
-        # TODO: Decide how to handle multiple category summaries in ProcessingResult
         summary = summaries[0] if summaries else None
 
         return ProcessingResult(

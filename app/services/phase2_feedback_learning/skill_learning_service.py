@@ -20,9 +20,9 @@ from app.models import (
     Transaction,
 )
 from app.services.phase2_feedback_learning.embeddings import EmbeddingsService
-from app.services.phase2_feedback_learning.openai_knowledge_store import (
-    OpenAIKnowledgeStore,
-    openai_knowledge_store,
+from app.services.phase2_feedback_learning.knowledge_store import (
+    KnowledgeStore,
+    knowledge_store,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,18 +35,18 @@ class SkillLearningService:
         self,
         db_session: AsyncSession,
         embeddings_service: Optional[EmbeddingsService] = None,
-        knowledge_store: Optional[OpenAIKnowledgeStore] = None
+        knowledge_store_instance: Optional[KnowledgeStore] = None
     ):
         """Initialize the skill learning service.
 
         Args:
             db_session: Database session
             embeddings_service: Optional embeddings service (will create if not provided)
-            knowledge_store: Optional knowledge store (will create if not provided)
+            knowledge_store_instance: Optional knowledge store (will use singleton if not provided)
         """
         self.db = db_session
         self.embeddings = embeddings_service or EmbeddingsService()
-        self.knowledge = knowledge_store or openai_knowledge_store
+        self.knowledge = knowledge_store_instance or knowledge_store
 
     async def create_learning(
         self,
@@ -545,7 +545,3 @@ This transaction should be categorized as '{corrected_category}' based on user f
                 unique_keywords.append(k)
 
         return unique_keywords[:10]  # Limit to 10 keywords
-
-
-# Note: The OpenAIKnowledgeStore already has store_learning method built-in
-# No need for monkey-patching anymore since we're using the new OpenAIKnowledgeStore class

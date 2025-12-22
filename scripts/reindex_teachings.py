@@ -1,6 +1,6 @@
 """
 Script to re-index all existing skill learnings from database to Pinecone.
-This will generate embeddings and store them in the OpenAI-specific Pinecone index.
+This will generate embeddings and store them in the Pinecone vector index.
 """
 
 import asyncio
@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.database import AsyncSessionLocal
 from app.models.db_models import SkillLearning
 from app.services.phase2_feedback_learning.embeddings import embeddings_service
-from app.services.phase2_feedback_learning.openai_knowledge_store import openai_knowledge_store
+from app.services.phase2_feedback_learning.knowledge_store import knowledge_store
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ async def reindex_all_learnings():
 
                 # Store in Pinecone with OpenAI embedding
                 vector_id = f"learning_{learning.id}"
-                result = await openai_knowledge_store.store(
+                result = await knowledge_store.store(
                     content=content,
                     metadata=metadata,
                     vector_id=vector_id
@@ -109,7 +109,7 @@ async def reindex_all_learnings():
         # Test search to verify
         if success_count > 0:
             logger.info("\nTesting search functionality...")
-            test_results = await openai_knowledge_store.search(
+            test_results = await knowledge_store.search(
                 query="council rates insurance interest",
                 top_k=5
             )

@@ -119,13 +119,12 @@ class TransactionCategorizer:
                 result.categorization_source = "document_context"
                 result.needs_review = False
                 result.review_reason = context_match.get("reason")
-                if hasattr(trace, 'record_context_match'):
-                    trace.record_context_match(
-                        True,
-                        context_match["category"],
-                        context_match["confidence"],
-                        context_match.get("reason", "")
-                    )
+                trace.record_context_match(
+                    True,
+                    context_match["category"],
+                    context_match["confidence"],
+                    context_match.get("reason", "")
+                )
                 result.categorization_trace = trace.to_dict()
                 return await self._apply_tax_rules(db, result, tax_return)
 

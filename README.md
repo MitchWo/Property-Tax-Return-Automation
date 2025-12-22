@@ -7,32 +7,36 @@ A production-ready system that automatically classifies documents, extracts and 
 
 ## System Status
 
-- **Version**: 3.4.0 (SSE Deduplication & Settlement Statement Improvements)
+- **Version**: 3.5.0 (AI Brain & Workings Generation)
 - **Status**: Production Ready with Full Audit Trail
 - **AI Model**: Claude Opus 4.5 (claude-opus-4-5-20251101)
 - **Transaction Processing**: Universal bank statement support via Claude AI
-- **Categorization**: Multi-layer with complete decision tracing
-- **RAG Integration**: Pinecone vector database with OpenAI embeddings
+- **Categorization**: 6-layer with complete decision tracing
+- **RAG Integration**: Pinecone vector database with 8 namespaces
+- **AI Brain**: Accountant workflow with complete P&L workings generation
 - **Workbook Template**: Lighthouse Financial compliant format
-- **Last Updated**: December 15, 2024
+- **Last Updated**: December 22, 2024
 
-### Recent Updates (v3.4.0)
+### Recent Updates (v3.5.0)
 
-- **SSE Duplicate Prevention**: Fixed issue where browser reconnections caused duplicate transaction processing
-- **Settlement Statement Order**: Transactions now appear in document order with clean descriptions
-- **Apportionment Calculations**: Automatic deductible calculation (Instalment - Apportionment)
-- **Progress Tracker Registry**: Global tracker prevents concurrent processing of same tax return
-- **P&L Summary Fix**: Corrected parseFloat handling for string-serialized decimal amounts
+- **AI Brain**: New accountant workflow that generates complete P&L workings with audit trail
+- **Workings Generation**: Full line-item breakdown with calculation logic and verification
+- **6-Layer Categorization**: Added document context matching as highest priority layer
+- **Extraction Validation**: Balance reconciliation and verification pass for accuracy
+- **8 RAG Namespaces**: Expanded knowledge store for specialized domains
+- **Document Inventory**: Track provided, missing, excluded, and duplicate documents
 
 ## Table of Contents
 
 - [Architecture Overview](#architecture-overview)
 - [Phase 1: Document Intake & Classification](#phase-1-document-intake--classification)
 - [Phase 2: Transaction Processing & Learning](#phase-2-transaction-processing--learning)
+- [AI Brain & Workings Generation](#ai-brain--workings-generation)
 - [Features](#features)
 - [Installation](#installation)
 - [API Documentation](#api-documentation)
 - [Document Types](#document-types)
+- [NZ Tax Business Rules](#nz-tax-business-rules)
 - [Development](#development)
 
 ## Architecture Overview
@@ -146,31 +150,41 @@ Phase 2 combines knowledge management and transaction processing into a unified 
 - **Tax Compliance**: Automatic interest deductibility rules (80% for existing, 100% for new builds)
 - **Professional Export**: Lighthouse Financial template format
 
-### Categorization Flow
+### 6-Layer Categorization Flow
 
 ```
 Transaction Input
         │
         ▼
 ┌───────────────────┐
-│ 1. YAML Patterns  │ ─── High confidence (95%) if matched
+│ 1. Document       │ ─── Loan account numbers, owner names (95%)
+│    Context        │
 └────────┬──────────┘
          │ No match
          ▼
 ┌───────────────────┐
-│ 2. Learned        │ ─── From user corrections (80-90%)
-│    Patterns       │
+│ 2. YAML Patterns  │ ─── Regex/payee matching from rules (95%)
 └────────┬──────────┘
          │ No match
          ▼
 ┌───────────────────┐
-│ 3. RAG Semantic   │ ─── Vector similarity search
+│ 3. Learned Exact  │ ─── Exact description match (90%)
+└────────┬──────────┘
+         │ No match
+         ▼
+┌───────────────────┐
+│ 4. Learned Fuzzy  │ ─── PostgreSQL pg_trgm similarity (80%)
+└────────┬──────────┘
+         │ No match
+         ▼
+┌───────────────────┐
+│ 5. RAG Semantic   │ ─── Pinecone vector similarity
 │    Search         │
 └────────┬──────────┘
          │ Low confidence
          ▼
 ┌───────────────────┐
-│ 4. Claude AI      │ ─── Batch processing (60-90%)
+│ 6. Claude AI      │ ─── Batch processing (20-25 per call)
 │    Fallback       │
 └───────────────────┘
 ```
@@ -189,8 +203,74 @@ When users review and correct transactions, the system:
 | Namespace | Purpose |
 |-----------|---------|
 | `transaction-coding` | Transaction categorization patterns |
-| `skill_learnings` | General domain knowledge learnings |
+| `skill_learnings` | General domain knowledge and teachings |
 | `document-review` | Document classification feedback |
+| `tax-rules` | Tax deductibility and treatment rules |
+| `gst-rules` | GST treatment and rules |
+| `pnl-mapping` | P&L row mapping knowledge |
+| `common-errors` | Common error patterns and corrections |
+| `workbook-structure` | Workbook/spreadsheet structure knowledge |
+
+## AI Brain & Workings Generation
+
+The AI Brain (`app/services/phase2_ai_brain/brain.py`) implements a real accountant workflow to generate complete P&L workings with full audit trail.
+
+### Generate Workings Flow
+
+When "Generate Workings" is triggered:
+
+```
+Step 1: TransactionProcessor.process_tax_return_transactions()
+        → Categorizes all transactions using 6-layer approach
+
+Step 2: AIBrain.process_tax_return()
+        → Generates complete workings with calculation logic
+```
+
+### Processing Steps
+
+1. **PM Statements** - Primary rent source
+2. **Bank Statements** - Cross-reference transactions
+3. **Loan Statements** - Extract interest only
+4. **Invoices** - Match to payments, apply >$800 rule
+5. **Cross-validation** - Between documents
+6. **QA Validation** - Auto-correction
+
+### Workings Output Structure
+
+Each income/expense line item includes:
+
+| Field | Description |
+|-------|-------------|
+| `category_code` | Category identifier |
+| `pl_row` | P&L row number (Lighthouse template) |
+| `gross_amount` | Total amount before adjustments |
+| `deductible_amount` | Tax deductible portion |
+| `source_code` | BS (Bank), PM (Property Manager), LS (Loan), SS (Settlement) |
+| `verification_status` | verified, needs_review, estimated |
+| `calculation_logic` | Full audit trail with steps |
+| `transactions` | List of individual transactions |
+
+### P&L Row Mapping (Lighthouse Template)
+
+| Row | Category |
+|-----|----------|
+| 6 | Rental Income |
+| 7 | Water Recovered |
+| 8 | Bank Contribution |
+| 12 | Advertising |
+| 13 | Agent Fees (PM + letting, GST-inclusive) |
+| 15 | Body Corporate (operating only) |
+| 16 | Consulting & Accounting ($862.50) |
+| 17 | Depreciation |
+| 18 | Due Diligence |
+| 24 | Insurance |
+| 25 | Interest Expense |
+| 27 | Legal Fees |
+| 34 | Rates |
+| 35 | Repairs & Maintenance |
+| 36 | Resident Society |
+| 41 | Water Rates |
 
 ## Features
 
@@ -221,6 +301,7 @@ property-tax-agent/
 │   ├── api/
 │   │   ├── routes.py                    # Phase 1 document routes
 │   │   ├── transaction_routes.py        # Phase 2 transaction processing
+│   │   ├── workings_routes.py           # AI Brain workings endpoints
 │   │   └── categorization_analytics.py  # Analytics endpoints
 │   ├── models/
 │   │   └── db_models.py                 # SQLAlchemy ORM models
@@ -231,15 +312,21 @@ property-tax-agent/
 │   │   ├── phase1_document_intake/      # Document processing
 │   │   │   ├── claude_client.py         # Claude AI integration
 │   │   │   ├── document_processor.py    # Main orchestration
+│   │   │   ├── document_inventory.py    # Document tracking
+│   │   │   ├── extraction_validator.py  # Balance reconciliation
 │   │   │   ├── file_handler.py          # File processing
-│   │   │   └── prompts.py               # AI prompts (with full extraction)
+│   │   │   ├── schemas.py               # Tool Use schemas
+│   │   │   └── prompts.py               # AI prompts
 │   │   ├── phase2_feedback_learning/    # Knowledge & RAG system
 │   │   │   ├── embeddings.py            # OpenAI embeddings
 │   │   │   ├── knowledge_store.py       # Pinecone integration
 │   │   │   └── skill_learning_service.py
+│   │   ├── phase2_ai_brain/             # AI Brain (Accountant Workflow)
+│   │   │   ├── brain.py                 # Main workings orchestrator
+│   │   │   └── workings_models.py       # Pydantic models for output
 │   │   ├── transaction_processor.py     # Main transaction orchestrator
 │   │   ├── transaction_extractor_claude.py  # Universal AI extractor
-│   │   ├── transaction_categorizer.py   # Multi-layer categorization
+│   │   ├── transaction_categorizer.py   # 6-layer categorization
 │   │   ├── rag_categorization_integration.py # RAG integration
 │   │   ├── categorization_trace.py      # Decision tracing
 │   │   ├── tax_rules_service.py         # Tax compliance rules
@@ -253,6 +340,8 @@ property-tax-agent/
 │   ├── database.py                      # Database setup
 │   └── main.py                          # FastAPI application
 ├── migrations/                          # Alembic migrations
+├── scripts/                             # Utility scripts
+│   └── reindex_teachings.py             # RAG re-indexing
 ├── tests/                               # Test suite
 ├── uploads/                             # Document storage
 │   └── workbooks/                       # Generated Excel files
@@ -335,7 +424,7 @@ LOG_LEVEL=INFO
 | `/api/returns/{id}` | GET | Get single tax return |
 | `/api/returns/{id}/documents` | GET | Get documents for a return |
 
-### Phase 2 Endpoints
+### Phase 2 Endpoints - Transactions
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -347,6 +436,19 @@ LOG_LEVEL=INFO
 | `/api/transactions/workbook/{tax_return_id}` | POST | Generate Excel workbook |
 | `/api/transactions/workbook/{tax_return_id}/download` | GET | Download workbook |
 
+### Phase 2 Endpoints - Workings (AI Brain)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/workings/{tax_return_id}/process` | POST | Generate workings (TransactionProcessor + AIBrain) |
+| `/api/workings/{tax_return_id}` | GET | Get complete workings data |
+| `/api/workings/{tax_return_id}/flags` | GET | Get all flags/issues |
+| `/api/workings/flags/{flag_id}/resolve` | PUT | Resolve a flag |
+| `/api/workings/{tax_return_id}/requests` | GET | Get document requests |
+| `/api/workings/{tax_return_id}/questions` | GET | Get client questions |
+| `/api/workings/{tax_return_id}/feedback` | POST | Submit calculation feedback |
+| `/api/workings/{tax_return_id}/confirm` | POST | Confirm calculation is correct |
+
 ### Analytics Endpoints
 
 | Endpoint | Method | Description |
@@ -355,23 +457,38 @@ LOG_LEVEL=INFO
 | `/api/categorization/{tax_return_id}/analytics` | GET | Get categorization analytics |
 | `/api/categorization/{tax_return_id}/audit-report` | GET | Get full audit report |
 
-## Document Types Supported
+## Document Types Supported (17 Types)
 
-| Type | Description | Key Data Extracted |
-|------|-------------|-------------------|
-| `bank_statement` | ANY bank format (AI-powered) | Transactions, interest, fees |
-| `loan_statement` | ANY loan format (AI-powered) | Interest/principal split |
-| `settlement_statement` | Property purchase records | Purchase price, settlement date |
-| `depreciation_schedule` | Valuit/FordBaker reports | Depreciation amounts |
-| `body_corporate` | Body corp levies | Fees, dates |
-| `property_manager_statement` | PM statements | Rent, management fees |
-| `rates` | Council rates notices | Rates amount |
-| `landlord_insurance` | Rental property insurance | Premium, coverage |
-| `healthy_homes` | Compliance reports | Status |
-| `ccc` | Code Compliance Certificates | Issue date |
-| `smoke_alarm` | Safety certificates | Compliance date |
-| `meth_test` | Contamination testing | Results |
-| `lim_report` | Land Information Memorandum | Property info |
+| Type | Description | Has Transaction Extraction |
+|------|-------------|---------------------------|
+| `bank_statement` | ANY bank format (AI-powered) | Yes (batch) |
+| `loan_statement` | ANY loan format (AI-powered) | Yes (batch) |
+| `property_manager_statement` | PM statements | Yes (batch) |
+| `settlement_statement` | Property purchase/sale | Yes |
+| `depreciation_schedule` | Valuit/FordBaker reports | Yes |
+| `body_corporate` | Body corp levies (operating/reserve) | Yes |
+| `rates` | Council rates notices | Yes |
+| `water_rates` | Water charges | Yes |
+| `landlord_insurance` | Rental property insurance | Yes |
+| `maintenance_invoice` | Repair/maintenance invoices | Yes |
+| `resident_society` | Resident society levies | Yes |
+| `healthy_homes` | Compliance reports | No |
+| `ccc` | Code Compliance Certificates | No |
+| `smoke_alarm` | Safety certificates | No |
+| `meth_test` | Contamination testing | No |
+| `lim_report` | Land Information Memorandum | No |
+| `other` / `invalid` | Unrecognized/invalid | No |
+
+### Document Inventory Tracking
+
+| Status | Description |
+|--------|-------------|
+| `PROVIDED` | Document received and extracted |
+| `MISSING` | Required but not provided |
+| `EXCLUDED` | Provided but not relevant |
+| `PARTIAL` | Partially provided (missing months) |
+| `WRONG_TYPE` | Wrong document type (e.g., home vs landlord insurance) |
+| `DUPLICATE` | Duplicate of another document |
 
 ## Blocking Conditions
 
@@ -391,6 +508,22 @@ The system automatically detects critical issues:
 | Existing Property | FY24 (2023-24) | 50% |
 | Existing Property | FY25 (2024-25) | 80% |
 | Existing Property | FY26 (2025-26) | 100% |
+
+## NZ Tax Business Rules
+
+Key business rules implemented in the AI Brain:
+
+| Rule | Description |
+|------|-------------|
+| **Interest** | Sum LOAN INTEREST debits only; exclude credits/adjustments/offsets |
+| **Year 1 Rates** | Bank Paid + (Vendor Instalment − Vendor Credit) from settlement |
+| **Legal Fees** | Under $10k = fully deductible (not capital) |
+| **Body Corporate** | Operating fund only (reserve fund = capital, not deductible) |
+| **PM Fees** | Always GST-inclusive (base + GST) |
+| **Repairs >$800** | Must have matching invoice |
+| **Accounting Fees** | Standard $862.50 always included |
+| **Due Diligence** | LIM, meth test, valuations → Row 18 |
+| **Depreciation** | Pro-rate by months if partial year ownership |
 
 ## Development
 
@@ -444,5 +577,5 @@ This project is proprietary software. All rights reserved.
 
 **Built for the NZ property investment community**
 
-*Last updated: December 15, 2024*
-*Version: 3.4.0 - SSE Deduplication & Settlement Statement Improvements*
+*Last updated: December 22, 2024*
+*Version: 3.5.0 - AI Brain & Workings Generation*

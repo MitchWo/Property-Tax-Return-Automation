@@ -9,16 +9,30 @@ class CategorizationTrace:
     def __init__(self):
         self.trace = {
             "layers": {
+                "context": {"matched": False},  # Document context layer (highest priority)
                 "yaml": {"matched": False},
                 "learned": {"matched": False},
                 "fuzzy": {"matched": False},
-                "rag": {"matched": False, "learnings_found": 0},  # Add RAG layer
+                "rag": {"matched": False, "learnings_found": 0},
                 "claude": None
             },
             "decision": None,
             "decided_by": None,
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
+
+    def record_context_match(self, matched: bool, category: str = None,
+                             confidence: float = 0, reason: str = None):
+        """Record document context matching result (e.g., loan account, owner name)."""
+        self.trace["layers"]["context"] = {
+            "matched": matched,
+            "category": category,
+            "confidence": confidence,
+            "reason": reason
+        }
+        if matched and not self.trace["decision"]:
+            self.trace["decision"] = category
+            self.trace["decided_by"] = "document_context"
 
     def record_yaml_match(self, matched: bool, category: str = None,
                           confidence: float = 0, pattern: str = None):
