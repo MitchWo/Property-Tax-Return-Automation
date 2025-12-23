@@ -20,6 +20,7 @@ DOCUMENT TYPES:
 | depreciation_schedule | Asset depreciation report | "Valuit", "FordBaker", depreciation calculations, asset list |
 | body_corporate | Body corporate levies | "Body Corporate", "BC Levy", unit title reference |
 | property_manager_statement | PM rent/expense statement | Property management company, rent collected, management fees |
+| rental_summary | Owner-prepared rental property workings | Spreadsheet with RENTAL INCOME + expenses for the rental property, weekly rent, rates, insurance, interest |
 | lim_report | Land Information Memorandum | Council letterhead, "LIM", property information |
 | healthy_homes | Healthy homes inspection | "Healthy Homes", compliance checklist, heating/ventilation/moisture |
 | meth_test | Methamphetamine testing | "Meth test", contamination levels, laboratory results |
@@ -29,6 +30,8 @@ DOCUMENT TYPES:
 | rates | Council rates notice | Council name, rates assessment, property valuation |
 | water_rates | Water rates/usage | Water supplier, usage charges |
 | maintenance_invoice | Repair/maintenance receipt | Tradesperson invoice, repair description |
+| personal_expense_claims | Personal/home office deductions | Home office %, mileage, mobile phone claims - NOT for rental property |
+| resident_society | Resident society levies | Resident society fees, community charges |
 | other | Unclassified relevant document | Related to property but doesn't fit categories |
 | invalid | Not relevant | Personal documents, unrelated items |
 
@@ -59,6 +62,24 @@ CRITICAL CLASSIFICATION RULES:
    - Verify property address matches
    - Extract certificate number
 
+6. RENTAL SUMMARY vs PERSONAL EXPENSE CLAIMS (CRITICAL DISTINCTION):
+   Use "rental_summary" when the spreadsheet/document contains:
+   - RENTAL INCOME (weekly rent, gross rent, rent received) for the RENTAL PROPERTY
+   - Rental property expenses (rates, insurance, interest, repairs for the rental)
+   - Property address matches the rental property context
+   - This is the owner's workings for their rental property tax return
+
+   Use "personal_expense_claims" when the spreadsheet/document contains:
+   - Home office deductions (% of house used for business)
+   - Personal mileage/travel claims
+   - Mobile phone claims
+   - Personal residence expenses (owner's home, NOT the rental property)
+   - No rental income - only personal deduction claims
+
+   KEY DIFFERENTIATOR: Does it contain RENTAL INCOME?
+   - YES → rental_summary
+   - NO (only home office/mileage/personal claims) → personal_expense_claims
+
 EXTRACTION REQUIREMENTS BY TYPE:
 
 For bank_statement extract:
@@ -66,6 +87,20 @@ For bank_statement extract:
 - period_start, period_end
 - opening_balance, closing_balance
 - rental_income_visible (true/false)
+
+⚠️ BANK CONTRIBUTION DETECTION (CRITICAL):
+Look for "Cash Contribution" or "Bank Initiated" credits on/near settlement date:
+- Description contains: "Bank Init", "Bank Initiated", "Cash Contrib", "Bank Contribution", "Cashback"
+- Large credit (typically $2,000 - $10,000) on or near property settlement date
+- Categorize as: "bank_contribution" with flag: needs_review=true, severity="warning", reasons=["Verify bank contribution with accountant"]
+
+Example patterns to detect:
+- "BANK INIT 12345" → bank_contribution
+- "CASH CONTRIBUTION" → bank_contribution
+- "BANK INITIATED CASHBACK" → bank_contribution
+- Large unexplained credit on settlement date → bank_contribution (flag for review)
+
+This is TAXABLE INCOME (Row 8 - Bank Contribution) and should not be missed!
 
 For loan_statement extract:
 - loan_account_number, lender
@@ -105,26 +140,61 @@ For landlord_insurance extract:
 - property_address, policy_type
 - sum_insured
 
-For property_manager_statement extract:
-- pm_company, period
-- property_address
-- gross_rent_collected
-- management_fee (PM percentage fee - base amount before GST)
-- management_fee_gst (GST on management fee)
-- total_management_fee (management_fee + management_fee_gst - GST INCLUSIVE total)
-- letting_fee (tenant finding fee if applicable)
-- inspection_fee (property inspection fees)
-- advertising_fee (tenant advertising)
-- maintenance_expenses (total maintenance/repairs paid)
-- insurance_claims (any insurance amounts)
-- rates_paid (if PM pays rates on behalf)
-- water_rates_paid (if PM pays water on behalf)
-- body_corporate_paid (if PM pays BC on behalf)
-- sundry_expenses (other miscellaneous expenses)
-- net_payment (amount paid to owner)
-- gst_amount (GST if registered)
-NOTE: Property manager statements should have ALL line items extracted as transactions in the transactions array
-IMPORTANT: PM fees for P&L should be GST-INCLUSIVE (base fee + GST). Example: $3,049.30 + GST $457.40 = $3,506.70 total
+For property_manager_statement extract ALL of the following:
+
+**INCOME SECTION:**
+- gross_rent: Total rent collected (before any deductions)
+- water_recovered: Water charges recovered from tenant
+- insurance_payout: Insurance claim payouts received (amount + description)
+- tenant_contribution: Tenant excess payments, damages, etc. (amount + description)
+- interest_earned: Interest on trust account
+- bond_received: Bond/deposit received (note: not taxable income)
+- introductory_funds: Initial funds from tenant (bond + advance rent)
+- other_income: Any other income items (array of {{description, amount}})
+- total_income: Sum of all income
+
+**EXPENSES SECTION:**
+- management_fee object:
+  - amount: BASE fee amount (before GST if GST shown separately)
+  - gst_amount: GST from adjacent column or "GST on management fees" line
+  - gst_inclusive: FALSE if GST is separate, TRUE if already included
+  - percentage: Fee percentage if shown (e.g., 8%)
+- letting_fee: Tenant finding fee (amount + gst_amount if separate)
+- inspection_fee: Property inspection fees (amount + gst_amount)
+- advertising: Trade Me listings, etc. (amount + gst_amount)
+- repairs: Array of {{description, amount, gst_amount, vendor, date, invoice_number}}
+- insurance_paid: Insurance paid by PM (amount + description)
+- rates_paid: Council rates paid by PM (amount + period)
+- water_rates_paid: Water charges paid by PM (amount + period)
+- body_corporate_paid: BC levies paid by PM (amount + period)
+- compliance_costs: Array of {{description, amount, gst_amount, is_capital}}
+  - Healthy homes assessment/inspection → is_capital: false (deductible)
+  - New heater/insulation installation → is_capital: true (capital)
+- sundry_expenses: Keys, postage, bank fees, etc.
+- other_expenses: Any other expenses NOT fitting above
+- total_expenses: Sum of all expenses
+- total_gst: Total GST if shown as summary
+
+**DISBURSEMENTS:**
+- owner_payments: Array of {{date, amount, reference}} for payments to owner
+- total_disbursed: Total paid to owner
+
+**SUMMARY:**
+- opening_balance, closing_balance, total_income, total_expenses, total_disbursed
+
+⚠️ PM FEE GST EXTRACTION (CRITICAL):
+Many PM statements show fees with GST in a SEPARATE COLUMN:
+| Description      | Amount   | GST      |
+| Management Fee   | $1,200   | $180     |
+| Letting Fee      | $540     | $81      |
+
+Extract like this:
+- management_fee.amount = 1200, management_fee.gst_amount = 180, management_fee.gst_inclusive = false
+- letting_fee.amount = 540, letting_fee.gst_amount = 81
+
+DO NOT put "GST on management fees" in other_expenses - use the gst_amount field instead!
+
+For P&L, total PM fee = base + GST = $1,200 + $180 = $1,380 (GST-inclusive)
 
 For depreciation_schedule extract:
 - provider (Valuit/FordBaker/other)

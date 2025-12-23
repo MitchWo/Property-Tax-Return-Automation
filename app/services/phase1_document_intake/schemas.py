@@ -17,6 +17,7 @@ DOCUMENT_CLASSIFICATION_TOOL = {
                     "depreciation_schedule",
                     "body_corporate",
                     "property_manager_statement",
+                    "rental_summary",
                     "lim_report",
                     "healthy_homes",
                     "meth_test",
@@ -985,11 +986,49 @@ PROPERTY_MANAGER_STATEMENT_EXTRACTION_TOOL = {
             },
             "income": {
                 "type": "object",
+                "description": "All income collected by the property manager",
                 "required": ["gross_rent"],
                 "properties": {
-                    "gross_rent": {"type": "number"},
+                    "gross_rent": {"type": "number", "description": "Total rent collected before any deductions"},
+                    "water_recovered": {
+                        "type": ["number", "null"],
+                        "description": "Water charges recovered from tenant"
+                    },
+                    "insurance_payout": {
+                        "type": "object",
+                        "description": "Insurance claim payouts received",
+                        "properties": {
+                            "amount": {"type": ["number", "null"]},
+                            "description": {"type": ["string", "null"]}
+                        }
+                    },
+                    "tenant_contribution": {
+                        "type": "object",
+                        "description": "Tenant contributions (excess payments, damages, etc.)",
+                        "properties": {
+                            "amount": {"type": ["number", "null"]},
+                            "description": {"type": ["string", "null"]}
+                        }
+                    },
+                    "interest_earned": {
+                        "type": ["number", "null"],
+                        "description": "Interest earned on trust account balance"
+                    },
+                    "bond_received": {
+                        "type": ["number", "null"],
+                        "description": "Bond/deposit received (note: not taxable income)"
+                    },
+                    "bond_released": {
+                        "type": ["number", "null"],
+                        "description": "Bond returned to tenant or owner"
+                    },
+                    "introductory_funds": {
+                        "type": ["number", "null"],
+                        "description": "Initial funds/advance from tenant (bond + advance rent)"
+                    },
                     "other_income": {
                         "type": "array",
+                        "description": "Any other income items not covered above",
                         "items": {
                             "type": "object",
                             "properties": {
@@ -998,46 +1037,134 @@ PROPERTY_MANAGER_STATEMENT_EXTRACTION_TOOL = {
                             }
                         }
                     },
-                    "total_income": {"type": "number"}
+                    "total_income": {"type": "number", "description": "Total of all income items"}
                 }
             },
             "expenses": {
                 "type": "object",
+                "description": "All expenses deducted by the property manager. IMPORTANT: Put GST on management fees in management_fee.gst_amount, NOT in other_expenses.",
                 "properties": {
                     "management_fee": {
                         "type": "object",
+                        "description": "Management fee details. IMPORTANT: If GST is shown separately (e.g., in adjacent column or as separate line), put the GST amount in 'gst_amount' field.",
                         "properties": {
-                            "amount": {"type": "number"},
-                            "gst_inclusive": {"type": "boolean"},
-                            "percentage": {"type": ["number", "null"]}
+                            "amount": {"type": "number", "description": "Base management fee amount (before GST if GST shown separately)"},
+                            "gst_amount": {"type": ["number", "null"], "description": "GST on management fee - extract from adjacent column or 'GST on management fees' line"},
+                            "gst_inclusive": {"type": "boolean", "description": "False if GST is shown separately, True if amount already includes GST"},
+                            "percentage": {"type": ["number", "null"], "description": "Management fee percentage if shown (e.g., 8%)"}
                         }
                     },
-                    "letting_fee": {"type": ["number", "null"]},
-                    "advertising": {"type": ["number", "null"]},
+                    "letting_fee": {
+                        "type": "object",
+                        "description": "Tenant finding/letting fee (usually one week's rent)",
+                        "properties": {
+                            "amount": {"type": ["number", "null"]},
+                            "gst_amount": {"type": ["number", "null"], "description": "GST on letting fee if shown separately"}
+                        }
+                    },
+                    "inspection_fee": {
+                        "type": "object",
+                        "description": "Property inspection fees",
+                        "properties": {
+                            "amount": {"type": ["number", "null"]},
+                            "gst_amount": {"type": ["number", "null"]}
+                        }
+                    },
+                    "advertising": {
+                        "type": "object",
+                        "description": "Tenant advertising costs (Trade Me, etc.)",
+                        "properties": {
+                            "amount": {"type": ["number", "null"]},
+                            "gst_amount": {"type": ["number", "null"]}
+                        }
+                    },
                     "repairs": {
                         "type": "array",
+                        "description": "Repairs and maintenance paid through PM",
                         "items": {
                             "type": "object",
                             "properties": {
                                 "description": {"type": "string"},
                                 "amount": {"type": "number"},
+                                "gst_amount": {"type": ["number", "null"]},
                                 "vendor": {"type": ["string", "null"]},
-                                "date": {"type": ["string", "null"]}
+                                "date": {"type": ["string", "null"]},
+                                "invoice_number": {"type": ["string", "null"]}
+                            }
+                        }
+                    },
+                    "insurance_paid": {
+                        "type": "object",
+                        "description": "Insurance paid by PM on owner's behalf (e.g., insurance claim excess, landlord insurance)",
+                        "properties": {
+                            "amount": {"type": ["number", "null"]},
+                            "description": {"type": ["string", "null"]}
+                        }
+                    },
+                    "rates_paid": {
+                        "type": "object",
+                        "description": "Council rates paid by PM on owner's behalf",
+                        "properties": {
+                            "amount": {"type": ["number", "null"]},
+                            "period": {"type": ["string", "null"]}
+                        }
+                    },
+                    "water_rates_paid": {
+                        "type": "object",
+                        "description": "Water rates/charges paid by PM",
+                        "properties": {
+                            "amount": {"type": ["number", "null"]},
+                            "period": {"type": ["string", "null"]}
+                        }
+                    },
+                    "body_corporate_paid": {
+                        "type": "object",
+                        "description": "Body corporate levies paid by PM on owner's behalf",
+                        "properties": {
+                            "amount": {"type": ["number", "null"]},
+                            "period": {"type": ["string", "null"]}
+                        }
+                    },
+                    "compliance_costs": {
+                        "type": "array",
+                        "description": "Healthy homes assessments, smoke alarms, insulation, etc.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "description": {"type": "string"},
+                                "amount": {"type": "number"},
+                                "gst_amount": {"type": ["number", "null"]},
+                                "is_capital": {"type": "boolean", "description": "True if this is a capital expense (new installation), False if deductible (assessment/repair)"}
+                            }
+                        }
+                    },
+                    "sundry_expenses": {
+                        "type": "array",
+                        "description": "Other miscellaneous expenses (keys, postage, bank fees, etc.)",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "description": {"type": "string"},
+                                "amount": {"type": "number"},
+                                "gst_amount": {"type": ["number", "null"]}
                             }
                         }
                     },
                     "other_expenses": {
                         "type": "array",
+                        "description": "Any other expenses not fitting above categories. DO NOT put GST on management fees here - use management_fee.gst_amount instead.",
                         "items": {
                             "type": "object",
                             "properties": {
                                 "description": {"type": "string"},
                                 "amount": {"type": "number"},
+                                "gst_amount": {"type": ["number", "null"]},
                                 "category": {"type": ["string", "null"]}
                             }
                         }
                     },
-                    "total_expenses": {"type": "number"}
+                    "total_expenses": {"type": "number", "description": "Total of all expenses (should equal sum of all expense items)"},
+                    "total_gst": {"type": ["number", "null"], "description": "Total GST on all expenses if shown as summary"}
                 }
             },
             "disbursements": {
@@ -1093,6 +1220,205 @@ PROPERTY_MANAGER_STATEMENT_EXTRACTION_TOOL = {
 }
 
 
+# Rental Summary Extraction Tool (owner-managed rental property income/expense summary)
+RENTAL_SUMMARY_EXTRACTION_TOOL = {
+    "name": "extract_rental_summary",
+    "description": "Extract income and expense details from owner-prepared rental property summary spreadsheets",
+    "input_schema": {
+        "type": "object",
+        "required": ["property_info", "income", "expenses", "summary"],
+        "properties": {
+            "property_info": {
+                "type": "object",
+                "required": ["property_address"],
+                "properties": {
+                    "property_address": {"type": ["string", "null"]},
+                    "owner_names": {"type": ["string", "null"]},
+                    "period_start": {"type": ["string", "null"], "format": "date"},
+                    "period_end": {"type": ["string", "null"], "format": "date"},
+                    "ownership_percentage": {
+                        "type": ["number", "null"],
+                        "description": "Ownership share if jointly owned (e.g., 50 for 50%)"
+                    },
+                    "management_type": {
+                        "type": "string",
+                        "enum": ["self_managed", "property_manager", "mixed"],
+                        "description": "How the property is managed"
+                    }
+                }
+            },
+            "income": {
+                "type": "object",
+                "required": ["gross_rent"],
+                "properties": {
+                    "gross_rent": {
+                        "type": "number",
+                        "description": "Total gross rental income for the period"
+                    },
+                    "rent_frequency": {
+                        "type": ["string", "null"],
+                        "enum": ["weekly", "fortnightly", "monthly"],
+                        "description": "How often rent is paid"
+                    },
+                    "rent_per_period": {
+                        "type": ["number", "null"],
+                        "description": "Rent amount per payment period (e.g., weekly rent)"
+                    },
+                    "weeks_rented": {
+                        "type": ["integer", "null"],
+                        "description": "Number of weeks property was tenanted"
+                    },
+                    "other_income": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "description": {"type": "string"},
+                                "amount": {"type": "number"},
+                                "category": {
+                                    "type": "string",
+                                    "enum": ["water_recovered", "bond_received", "insurance_payout", "other"]
+                                }
+                            }
+                        }
+                    },
+                    "total_income": {
+                        "type": "number",
+                        "description": "Total income including rent and other income"
+                    }
+                }
+            },
+            "expenses": {
+                "type": "object",
+                "properties": {
+                    "interest": {
+                        "type": "object",
+                        "properties": {
+                            "gross_interest": {"type": ["number", "null"], "description": "Total interest paid"},
+                            "deductible_percentage": {"type": ["number", "null"], "description": "Percentage deductible (e.g., 80 for 80%)"},
+                            "deductible_amount": {"type": ["number", "null"], "description": "Deductible interest amount"}
+                        }
+                    },
+                    "rates": {
+                        "type": "object",
+                        "properties": {
+                            "council_rates": {"type": ["number", "null"]},
+                            "water_rates": {"type": ["number", "null"]},
+                            "regional_rates": {"type": ["number", "null"]},
+                            "total_rates": {"type": ["number", "null"]}
+                        }
+                    },
+                    "insurance": {
+                        "type": "object",
+                        "properties": {
+                            "landlord_insurance": {"type": ["number", "null"]},
+                            "house_insurance": {"type": ["number", "null"]},
+                            "total_insurance": {"type": ["number", "null"]}
+                        }
+                    },
+                    "property_management": {
+                        "type": "object",
+                        "properties": {
+                            "management_fees": {"type": ["number", "null"]},
+                            "letting_fees": {"type": ["number", "null"]},
+                            "inspection_fees": {"type": ["number", "null"]},
+                            "total_pm_fees": {"type": ["number", "null"]}
+                        }
+                    },
+                    "repairs_maintenance": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "description": {"type": "string"},
+                                "amount": {"type": "number"},
+                                "vendor": {"type": ["string", "null"]},
+                                "date": {"type": ["string", "null"]}
+                            }
+                        }
+                    },
+                    "repairs_total": {"type": ["number", "null"]},
+                    "body_corporate": {
+                        "type": "object",
+                        "properties": {
+                            "operating_levy": {"type": ["number", "null"]},
+                            "reserve_levy": {"type": ["number", "null"]},
+                            "total_levy": {"type": ["number", "null"]}
+                        }
+                    },
+                    "travel": {
+                        "type": "object",
+                        "properties": {
+                            "kilometres": {"type": ["number", "null"]},
+                            "rate_per_km": {"type": ["number", "null"]},
+                            "total_travel": {"type": ["number", "null"]}
+                        }
+                    },
+                    "depreciation": {
+                        "type": "object",
+                        "properties": {
+                            "chattels_depreciation": {"type": ["number", "null"]},
+                            "building_depreciation": {"type": ["number", "null"]},
+                            "total_depreciation": {"type": ["number", "null"]}
+                        }
+                    },
+                    "other_expenses": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "description": {"type": "string"},
+                                "amount": {"type": "number"},
+                                "category": {"type": ["string", "null"]}
+                            }
+                        }
+                    },
+                    "total_expenses": {
+                        "type": "number",
+                        "description": "Total deductible expenses"
+                    }
+                }
+            },
+            "summary": {
+                "type": "object",
+                "required": ["total_income", "total_expenses"],
+                "properties": {
+                    "total_income": {"type": "number"},
+                    "total_expenses": {"type": "number"},
+                    "net_rental_income": {
+                        "type": "number",
+                        "description": "Net rental income/loss (income minus expenses)"
+                    },
+                    "ownership_share_amount": {
+                        "type": ["number", "null"],
+                        "description": "Net amount for this owner's share if jointly owned"
+                    }
+                }
+            },
+            "flags": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "flag_code": {"type": "string"},
+                        "severity": {"type": "string", "enum": ["critical", "warning", "info"]},
+                        "message": {"type": "string"}
+                    }
+                }
+            },
+            "extraction_metadata": {
+                "type": "object",
+                "properties": {
+                    "data_quality_score": {"type": "number", "minimum": 0, "maximum": 1},
+                    "sheets_processed": {"type": "integer"},
+                    "has_depreciation_schedule": {"type": "boolean"}
+                }
+            }
+        }
+    }
+}
+
+
 def get_extraction_tool_for_document_type(document_type: str) -> dict:
     """Get the appropriate Tool Use schema for a document type."""
     TOOL_MAPPING = {
@@ -1102,11 +1428,16 @@ def get_extraction_tool_for_document_type(document_type: str) -> dict:
         "property_manager_statement": PROPERTY_MANAGER_STATEMENT_EXTRACTION_TOOL,
         "body_corporate": BODY_CORPORATE_EXTRACTION_TOOL,
         "depreciation_schedule": DEPRECIATION_SCHEDULE_EXTRACTION_TOOL,
+        # Owner-prepared rental property summary (income + expenses)
+        "rental_summary": RENTAL_SUMMARY_EXTRACTION_TOOL,
         # Generic expense tool for these types
         "rates": EXPENSE_DOCUMENT_EXTRACTION_TOOL,
         "water_rates": EXPENSE_DOCUMENT_EXTRACTION_TOOL,
         "landlord_insurance": EXPENSE_DOCUMENT_EXTRACTION_TOOL,
         "maintenance_invoice": EXPENSE_DOCUMENT_EXTRACTION_TOOL,
         "resident_society": EXPENSE_DOCUMENT_EXTRACTION_TOOL,
+        # Client-prepared expense summaries (NOT rental property - home office, mileage, etc.)
+        "personal_expense_claims": EXPENSE_DOCUMENT_EXTRACTION_TOOL,
+        "rental_expense_summary": EXPENSE_DOCUMENT_EXTRACTION_TOOL,
     }
     return TOOL_MAPPING.get(document_type)

@@ -41,6 +41,7 @@ from app.models.db_models import (
     FlagCategory,
 )
 from app.services.phase1_document_intake.claude_client import ClaudeClient
+from app.services.phase1_document_intake.extraction_validator import ExtractionValidator
 from app.services.phase2_ai_brain.workings_models import (
     TaxReturnWorkingsData,
     WorkingsSummary,
@@ -594,14 +595,24 @@ If you cannot determine a new value, respond with:
             doc_type = doc.document_type or "unknown"
             if doc_type not in documents_by_type:
                 documents_by_type[doc_type] = []
+
+            # Validate and correct extracted_data before using
+            extracted_data = doc.extracted_data.copy() if doc.extracted_data else {}
+            extracted_data = self._validate_extracted_data(extracted_data, doc_type)
+
             documents_by_type[doc_type].append({
                 "id": str(doc.id),
                 "filename": doc.original_filename,
                 "file_path": doc.file_path,  # Include file path for raw content reading
                 "document_type": doc_type,
-                "extracted_data": doc.extracted_data,
+                "extracted_data": extracted_data,
                 "confidence": doc.classification_confidence
             })
+
+        # Detect potential bank contributions that may have been missed
+        potential_bank_contributions = self._detect_potential_bank_contributions(documents_by_type)
+        if potential_bank_contributions:
+            logger.info(f"Detected {len(potential_bank_contributions)} potential bank contributions for review")
 
         return {
             "tax_return": {
@@ -618,7 +629,8 @@ If you cannot determine a new value, respond with:
             "inventory": inventory_data,
             "tax_rules": tax_rules,
             "yaml_rules": self.yaml_rules,
-            "rag_learnings": rag_learnings
+            "rag_learnings": rag_learnings,
+            "potential_bank_contributions": potential_bank_contributions
         }
 
     def _build_accountant_prompt(self, context: Dict[str, Any]) -> str:
@@ -629,18 +641,33 @@ If you cannot determine a new value, respond with:
         tax_rules = context["tax_rules"]
 
         # Get interest deductibility percentage
-        interest_percentage = 100.0
+        # Default based on property type and tax year (conservative approach)
+        # - New builds (CCC after 27 March 2020): 100% deductible
+        # - Existing properties: 80% (FY25), 100% (FY26+)
+        # - Unknown/NOT_SURE: Use conservative 80% for FY25
+        property_type = tax_return.get("property_type", "").lower()
+        tax_year = tax_return.get("tax_year", "FY25")
+
+        # Determine default based on property type and year
+        if property_type == "new_build":
+            interest_percentage = 100.0
+        elif tax_year in ("FY25", "FY2025"):
+            interest_percentage = 80.0  # Conservative default for FY25
+        else:
+            interest_percentage = 100.0  # FY26+ or unknown year
+
+        # Override with tax_rules if available
         if tax_rules:
             # tax_rules is a dict keyed by rule_type
             if isinstance(tax_rules, dict):
                 interest_rule = tax_rules.get("interest_deductibility", {})
-                if isinstance(interest_rule, dict):
-                    interest_percentage = interest_rule.get("percentage", 100.0)
+                if isinstance(interest_rule, dict) and "percentage" in interest_rule:
+                    interest_percentage = interest_rule.get("percentage")
             elif isinstance(tax_rules, list):
                 # Legacy list format support
                 for rule in tax_rules:
                     if isinstance(rule, dict) and rule.get("rule_type") == "interest_deductibility":
-                        interest_percentage = rule.get("value", {}).get("percentage", 100.0)
+                        interest_percentage = rule.get("value", {}).get("percentage", interest_percentage)
                         break
 
         # Format documents summary
@@ -652,6 +679,18 @@ If you cannot determine a new value, respond with:
         # Format RAG learnings
         rag_context = self._format_rag_learnings(context.get("rag_learnings", []))
 
+        # Format potential bank contributions
+        potential_contributions = context.get("potential_bank_contributions", [])
+        bank_contrib_section = ""
+        if potential_contributions:
+            bank_contrib_section = "\n\n## ⚠️ DETECTED POTENTIAL BANK CONTRIBUTIONS (REQUIRES ACCOUNTANT REVIEW)\n"
+            bank_contrib_section += "The following transactions have been flagged as potential bank contributions:\n"
+            for contrib in potential_contributions:
+                bank_contrib_section += f"- **${contrib['amount']:.2f}** on {contrib['date']}: {contrib['description']}\n"
+                bank_contrib_section += f"  - Reason: {contrib['reason']}\n"
+                bank_contrib_section += f"  - Settlement date: {contrib['settlement_date']} ({contrib['days_from_settlement']} days difference)\n"
+            bank_contrib_section += "\n**ACTION REQUIRED**: Include these as Bank Contribution (Row 8) income with flag: 'Verify with accountant'\n"
+
         prompt = f"""You are an experienced New Zealand property tax accountant preparing workings for a rental property tax return.
 
 ## Property Details
@@ -662,7 +701,7 @@ If you cannot determine a new value, respond with:
 - Interest Deductibility: {interest_percentage}% (based on property type and tax year)
 
 ## Documents Provided
-{docs_summary}
+{docs_summary}{bank_contrib_section}
 
 ## Important Notes on Data Quality
 - Transaction categories shown in brackets [category] are from Phase 1 AI - treat as SUGGESTIONS only
@@ -683,12 +722,23 @@ Follow this EXACT workflow to prepare the tax return workings:
 - If no PM: Identify direct tenant rent payments
 - Identify expenses: Rates (council), insurance, water rates, bank fees, loan payments
 - Flag any expected expense not found (e.g., no rates = unusual)
-- **IMPORTANT: Look for "Cash Contribution" from bank** (usually on/near settlement date)
-  - This is TAXABLE INCOME (bank cashback/incentive)
-  - Category: bank_contribution (Row 8)
-  - Do NOT categorize as transfer or capital
-  - **VERIFICATION REQUIRED**: If settlement statement mentions a cashback, MUST verify it appears in bank statement or loan statement
-  - If NO bank/loan statement evidence exists to verify the cashback, FLAG for review but do NOT include in P&L
+
+⚠️ **CRITICAL: BANK CONTRIBUTION DETECTION** (usually on/near settlement date)
+Look for credits that are bank cashback/incentives - these are TAXABLE INCOME:
+
+**Patterns to detect:**
+- "Bank Init", "Bank Initiated", "BANK INIT" + reference number
+- "Cash Contribution", "Cash Contrib", "Cashback"
+- Large unexplained credit ($2,000-$10,000) on settlement date
+
+**If found:**
+- Category: bank_contribution (Row 8 - Bank Contribution)
+- This is TAXABLE INCOME - do NOT miss it!
+- Do NOT categorize as transfer, capital, or unknown
+- **FLAG for accountant review**: needs_review=true, reasons=["Bank contribution - verify with accountant"]
+
+**If settlement statement mentions cashback but no bank statement evidence:**
+- FLAG for review but do NOT include in P&L
 
 ### STEP 3: Loan Statements
 - Match bank statement loan payments to loan statement
@@ -783,6 +833,30 @@ Before finalizing, verify you have:
 If interest appears unusually low, check for offset account indicators.
 Low interest with offset is CORRECT - do NOT flag as error.
 Sum only actual "LOAN INTEREST" debits, exclude "OFFSET Benefit" entries.
+
+### INTEREST DEDUCTIBILITY PERCENTAGE RULES (NZ TAX LAW)
+
+**⚠️ CRITICAL: Apply the correct deductibility percentage based on property type and tax year:**
+
+| Property Type | FY25 (2024-25) | FY26 (2025-26) | FY27+ |
+|--------------|----------------|----------------|-------|
+| **New Build** (CCC after 27 March 2020) | 100% | 100% | 100% |
+| **Existing Property** | 80% | 100% | 100% |
+| **Unknown/NOT_SURE** | 80% (conservative) | 100% | 100% |
+
+**Key Rules:**
+1. **New Build = 100% deductible** ONLY if Code Compliance Certificate (CCC) was issued after 27 March 2020
+2. **Existing = 80% for FY25** - This is the current year's phased deductibility rule
+3. **When in doubt, use 80%** - It's safer to under-claim than over-claim
+4. **Do NOT default to 100%** unless property type is CONFIRMED as new_build with CCC evidence
+
+**Calculation:**
+```
+Deductible Interest = Gross Interest × Deductibility Percentage
+Example (Existing, FY25): $10,000 × 80% = $8,000 deductible
+```
+
+**The current return uses: {interest_percentage}% deductibility**
 
 ### YEAR 1 SETTLEMENT STATEMENT RULES
 If Year 1 (property purchased this FY), settlement statement is MANDATORY.
@@ -1193,6 +1267,244 @@ Return ONLY the JSON object, no other text.
 """
         return prompt
 
+    def _validate_extracted_data(self, extracted_data: Dict[str, Any], doc_type: str) -> Dict[str, Any]:
+        """
+        Validate and correct extracted data before using in workings.
+
+        This catches cases where Claude's extraction has internal inconsistencies,
+        such as interest_analysis.total_interest_debits not matching the sum of monthly_breakdown.
+        """
+        if not extracted_data:
+            return extracted_data
+
+        # Check tool_use_extraction for bank statements
+        if doc_type == "bank_statement":
+            tool_use = extracted_data.get("tool_use_extraction", {})
+            if tool_use:
+                interest_analysis = tool_use.get("interest_analysis", {})
+                if interest_analysis:
+                    self._validate_and_correct_interest_analysis(interest_analysis, tool_use)
+                    # Also update top-level if exists
+                    if "interest_analysis" in extracted_data:
+                        extracted_data["interest_analysis"] = interest_analysis.copy()
+
+            # Also check top-level interest_analysis
+            top_level_interest = extracted_data.get("interest_analysis", {})
+            if top_level_interest and not tool_use:
+                transactions = extracted_data.get("transactions", [])
+                self._validate_and_correct_interest_analysis(top_level_interest, {"transactions": transactions})
+
+        return extracted_data
+
+    def _validate_and_correct_interest_analysis(
+        self,
+        interest_analysis: Dict[str, Any],
+        extracted_data: Dict[str, Any]
+    ) -> None:
+        """
+        Validate that interest_analysis.total_interest_debits matches the sum of monthly_breakdown.
+
+        If there's a discrepancy, correct total_interest_debits to match the actual sum.
+        """
+        if not interest_analysis:
+            return
+
+        monthly_breakdown = interest_analysis.get("monthly_breakdown", {})
+        stated_total = float(interest_analysis.get("total_interest_debits", 0))
+
+        if not monthly_breakdown:
+            # No monthly breakdown to validate against
+            return
+
+        # Calculate actual sum from monthly breakdown
+        actual_sum = sum(float(v) for v in monthly_breakdown.values())
+
+        # Also verify against transaction sum if available
+        transactions = extracted_data.get("transactions", [])
+        txn_interest_sum = 0.0
+        if transactions:
+            for txn in transactions:
+                desc = str(txn.get("description", "")).upper()
+                txn_type = txn.get("transaction_type", "")
+                if "LOAN" in desc and "INT" in desc and txn_type == "debit":
+                    txn_interest_sum += abs(float(txn.get("amount", 0)))
+
+        # Determine the correct value
+        # Priority: transaction sum > monthly breakdown sum > stated total
+        tolerance = 0.02
+        correct_value = stated_total
+
+        if txn_interest_sum > 0:
+            if abs(txn_interest_sum - stated_total) > tolerance:
+                logger.warning(
+                    f"Interest analysis correction: stated={stated_total:.2f}, "
+                    f"transaction_sum={txn_interest_sum:.2f}, monthly_sum={actual_sum:.2f}. "
+                    f"Using transaction sum."
+                )
+                correct_value = txn_interest_sum
+                interest_analysis["_correction_applied"] = True
+                interest_analysis["_original_stated_total"] = stated_total
+        elif abs(actual_sum - stated_total) > tolerance:
+            logger.warning(
+                f"Interest analysis correction: stated={stated_total:.2f}, "
+                f"monthly_sum={actual_sum:.2f}. Using monthly sum."
+            )
+            correct_value = actual_sum
+            interest_analysis["_correction_applied"] = True
+            interest_analysis["_original_stated_total"] = stated_total
+
+        interest_analysis["total_interest_debits"] = correct_value
+
+    def _detect_potential_bank_contributions(
+        self,
+        documents_by_type: Dict[str, List[Dict[str, Any]]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Detect potential bank contributions that may have been missed.
+
+        Looks for large unexplained credits on/near settlement date in bank statements.
+        Returns list of potential bank contributions to flag for accountant review.
+        """
+        from datetime import datetime, timedelta
+
+        potential_contributions = []
+
+        # Step 1: Get settlement date from settlement statement
+        settlement_date = None
+        settlement_docs = documents_by_type.get("settlement_statement", [])
+        for doc in settlement_docs:
+            extracted = doc.get("extracted_data", {})
+            tool_use = extracted.get("tool_use_extraction", {})
+
+            # Try to find settlement date from various fields
+            for field in ["settlement_date", "date"]:
+                if tool_use.get(field):
+                    try:
+                        settlement_date = datetime.strptime(str(tool_use[field]), "%Y-%m-%d").date()
+                        break
+                    except ValueError:
+                        pass
+
+            # Also try to extract from line item descriptions (e.g., "23/08/24")
+            if not settlement_date:
+                line_items = tool_use.get("all_line_items", [])
+                for item in line_items:
+                    desc = item.get("description", "")
+                    # Look for date patterns like "23/08/24" or "23/08/2024"
+                    import re
+                    date_match = re.search(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', desc)
+                    if date_match:
+                        try:
+                            day, month, year = date_match.groups()
+                            if len(year) == 2:
+                                year = "20" + year
+                            settlement_date = datetime(int(year), int(month), int(day)).date()
+                            break
+                        except ValueError:
+                            pass
+                if settlement_date:
+                    break
+
+        if not settlement_date:
+            logger.debug("No settlement date found - skipping bank contribution detection")
+            return potential_contributions
+
+        logger.info(f"Settlement date detected: {settlement_date}")
+
+        # Step 2: Look through bank statement transactions for large unexplained credits
+        bank_docs = documents_by_type.get("bank_statement", [])
+        for doc in bank_docs:
+            extracted = doc.get("extracted_data", {})
+            tool_use = extracted.get("tool_use_extraction", {})
+            transactions = tool_use.get("transactions", [])
+
+            for txn in transactions:
+                # Only look at credits
+                if txn.get("transaction_type") != "credit":
+                    continue
+
+                amount = float(txn.get("amount", 0) or 0)
+
+                # Only consider large credits ($1,500 - $15,000 range typical for bank contributions)
+                if amount < 1500 or amount > 15000:
+                    continue
+
+                # Check if already categorized as bank_contribution
+                categorization = txn.get("categorization", {})
+                if categorization.get("suggested_category") == "bank_contribution":
+                    continue
+
+                # Skip if already clearly categorized as something else
+                category = categorization.get("suggested_category", "unknown")
+                if category in ["rental_income", "insurance_payout", "bond_received", "transfer_between_accounts"]:
+                    # Check confidence - if high confidence, skip
+                    if categorization.get("confidence", 0) > 0.8:
+                        continue
+
+                # Parse transaction date
+                txn_date_str = txn.get("date", "")
+                txn_date = None
+                for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%d/%m/%y"]:
+                    try:
+                        txn_date = datetime.strptime(txn_date_str, fmt).date()
+                        break
+                    except ValueError:
+                        pass
+
+                if not txn_date:
+                    continue
+
+                # Check if within 7 days of settlement date
+                days_diff = abs((txn_date - settlement_date).days)
+                if days_diff <= 7:
+                    description = txn.get("description", "") or ""
+
+                    # Check for bank contribution patterns in description
+                    desc_upper = description.upper()
+                    is_likely_bank_contrib = any(pattern in desc_upper for pattern in [
+                        "BANK INIT", "BANK INITIATED", "CASH CONTRIB", "CASHBACK",
+                        "BANK CONTRIBUTION", "SETTLEMENT CASHBACK", "BANK CASH"
+                    ])
+
+                    # Also flag if description is empty/minimal and amount is in typical range
+                    is_unexplained = len(description.strip()) < 5 and 2000 <= amount <= 10000
+
+                    if is_likely_bank_contrib or is_unexplained:
+                        potential_contributions.append({
+                            "date": txn_date_str,
+                            "amount": amount,
+                            "description": description or "(no description)",
+                            "reason": "Likely bank contribution" if is_likely_bank_contrib else "Large unexplained credit near settlement date",
+                            "document": doc.get("filename", ""),
+                            "current_category": category,
+                            "settlement_date": str(settlement_date),
+                            "days_from_settlement": days_diff
+                        })
+
+                        # Flag the transaction in the extracted data
+                        if "review_flags" not in txn:
+                            txn["review_flags"] = {}
+                        txn["review_flags"]["needs_review"] = True
+                        txn["review_flags"]["severity"] = "warning"
+                        if "reasons" not in txn["review_flags"]:
+                            txn["review_flags"]["reasons"] = []
+                        txn["review_flags"]["reasons"].append(
+                            f"Potential bank contribution (${amount:.2f}) - verify with accountant"
+                        )
+
+                        # Update categorization suggestion
+                        txn["categorization"]["suggested_category"] = "bank_contribution"
+                        txn["categorization"]["confidence"] = 0.6
+                        txn["categorization"]["is_deductible"] = False
+                        txn["categorization"]["_flagged_for_review"] = True
+
+                        logger.warning(
+                            f"Potential bank contribution detected: ${amount:.2f} on {txn_date_str} "
+                            f"({days_diff} days from settlement) - flagged for accountant review"
+                        )
+
+        return potential_contributions
+
     def _format_documents_summary(self, documents_by_type: Dict[str, List]) -> str:
         """Format documents summary for the prompt."""
         lines = []
@@ -1386,6 +1698,157 @@ Return ONLY the JSON object, no other text.
             lines.append("\n**Flags:**")
             for flag in flags:
                 lines.append(f"  🚩 {flag}")
+
+        # Special handling for PM statements - show full breakdown with GST
+        if doc_type == "property_manager_statement":
+            tool_use = extracted.get("tool_use_extraction", {})
+            if tool_use:
+                # INCOME SECTION
+                income = tool_use.get("income", {})
+                if income:
+                    lines.append("\n**📥 PM INCOME BREAKDOWN:**")
+                    if income.get("gross_rent"):
+                        lines.append(f"  - Gross Rent: ${income['gross_rent']:.2f}")
+                    if income.get("water_recovered"):
+                        lines.append(f"  - Water Recovered: ${income['water_recovered']:.2f}")
+                    if income.get("insurance_payout") and isinstance(income["insurance_payout"], dict):
+                        payout = income["insurance_payout"]
+                        if payout.get("amount"):
+                            lines.append(f"  - Insurance Payout: ${payout['amount']:.2f} ({payout.get('description', '')})")
+                    if income.get("tenant_contribution") and isinstance(income["tenant_contribution"], dict):
+                        contrib = income["tenant_contribution"]
+                        if contrib.get("amount"):
+                            lines.append(f"  - Tenant Contribution: ${contrib['amount']:.2f} ({contrib.get('description', '')})")
+                    if income.get("interest_earned"):
+                        lines.append(f"  - Interest Earned: ${income['interest_earned']:.2f}")
+                    if income.get("bond_received"):
+                        lines.append(f"  - Bond Received: ${income['bond_received']:.2f} (NOT income)")
+                    for other in income.get("other_income", []):
+                        if isinstance(other, dict):
+                            lines.append(f"  - {other.get('description', 'Other')}: ${other.get('amount', 0):.2f}")
+                    if income.get("total_income"):
+                        lines.append(f"  **TOTAL INCOME: ${income['total_income']:.2f}**")
+
+                # EXPENSES SECTION
+                expenses = tool_use.get("expenses", {})
+                if expenses:
+                    lines.append("\n**📤 PM EXPENSES BREAKDOWN (CHECK GST!):**")
+
+                    # Helper function to format fee with GST
+                    def format_fee_with_gst(name: str, fee_data, default_gst_inclusive: bool = True):
+                        if not fee_data:
+                            return None
+                        if isinstance(fee_data, (int, float)):
+                            return f"  - {name}: ${fee_data:.2f}"
+                        if isinstance(fee_data, dict):
+                            base = fee_data.get("amount", 0) or 0
+                            gst = fee_data.get("gst_amount", 0) or 0
+                            gst_incl = fee_data.get("gst_inclusive", default_gst_inclusive)
+                            if gst > 0:
+                                total = base + gst
+                                return f"  - {name}: ${base:.2f} + GST ${gst:.2f} = **${total:.2f}**"
+                            elif not gst_incl and base > 0:
+                                gst_calc = base * 0.15
+                                total = base + gst_calc
+                                return f"  - {name}: ${base:.2f} + GST ${gst_calc:.2f} = **${total:.2f}** (GST calculated)"
+                            elif base > 0:
+                                return f"  - {name}: ${base:.2f} (GST-inclusive: {gst_incl})"
+                        return None
+
+                    # Management fee
+                    mgmt_line = format_fee_with_gst("Management Fee", expenses.get("management_fee"), False)
+                    if mgmt_line:
+                        lines.append(mgmt_line)
+
+                    # Letting fee
+                    letting_line = format_fee_with_gst("Letting Fee", expenses.get("letting_fee"))
+                    if letting_line:
+                        lines.append(letting_line)
+
+                    # Inspection fee
+                    insp_line = format_fee_with_gst("Inspection Fee", expenses.get("inspection_fee"))
+                    if insp_line:
+                        lines.append(insp_line)
+
+                    # Advertising
+                    ad_line = format_fee_with_gst("Advertising", expenses.get("advertising"))
+                    if ad_line:
+                        lines.append(ad_line)
+
+                    # Repairs
+                    for repair in expenses.get("repairs", []):
+                        if isinstance(repair, dict) and repair.get("amount"):
+                            desc = repair.get("description", "Repair")
+                            amt = repair.get("amount", 0)
+                            gst = repair.get("gst_amount", 0) or 0
+                            vendor = repair.get("vendor", "")
+                            if gst > 0:
+                                lines.append(f"  - Repair: {desc} - ${amt:.2f} + GST ${gst:.2f} = ${amt + gst:.2f} ({vendor})")
+                            else:
+                                lines.append(f"  - Repair: {desc} - ${amt:.2f} ({vendor})")
+
+                    # Insurance paid
+                    if expenses.get("insurance_paid") and isinstance(expenses["insurance_paid"], dict):
+                        ins = expenses["insurance_paid"]
+                        if ins.get("amount"):
+                            lines.append(f"  - Insurance Paid: ${ins['amount']:.2f} ({ins.get('description', '')})")
+
+                    # Rates paid
+                    if expenses.get("rates_paid") and isinstance(expenses["rates_paid"], dict):
+                        rates = expenses["rates_paid"]
+                        if rates.get("amount"):
+                            lines.append(f"  - Rates Paid: ${rates['amount']:.2f} ({rates.get('period', '')})")
+
+                    # Water rates paid
+                    if expenses.get("water_rates_paid") and isinstance(expenses["water_rates_paid"], dict):
+                        water = expenses["water_rates_paid"]
+                        if water.get("amount"):
+                            lines.append(f"  - Water Rates Paid: ${water['amount']:.2f} ({water.get('period', '')})")
+
+                    # Body corporate paid
+                    if expenses.get("body_corporate_paid") and isinstance(expenses["body_corporate_paid"], dict):
+                        bc = expenses["body_corporate_paid"]
+                        if bc.get("amount"):
+                            lines.append(f"  - Body Corporate Paid: ${bc['amount']:.2f} ({bc.get('period', '')})")
+
+                    # Compliance costs
+                    for comp in expenses.get("compliance_costs", []):
+                        if isinstance(comp, dict) and comp.get("amount"):
+                            desc = comp.get("description", "Compliance")
+                            amt = comp.get("amount", 0)
+                            is_cap = comp.get("is_capital", False)
+                            cap_label = "CAPITAL" if is_cap else "Deductible"
+                            lines.append(f"  - {desc}: ${amt:.2f} [{cap_label}]")
+
+                    # Sundry expenses
+                    for sundry in expenses.get("sundry_expenses", []):
+                        if isinstance(sundry, dict) and sundry.get("amount"):
+                            lines.append(f"  - {sundry.get('description', 'Sundry')}: ${sundry.get('amount', 0):.2f}")
+
+                    # Other expenses
+                    for other in expenses.get("other_expenses", []):
+                        if isinstance(other, dict) and other.get("amount"):
+                            lines.append(f"  - {other.get('description', 'Other')}: ${other.get('amount', 0):.2f} [{other.get('category', '')}]")
+
+                    # Totals
+                    if expenses.get("total_gst"):
+                        lines.append(f"  - Total GST: ${expenses['total_gst']:.2f}")
+                    if expenses.get("total_expenses"):
+                        lines.append(f"  **TOTAL EXPENSES: ${expenses['total_expenses']:.2f}**")
+
+                # DISBURSEMENTS
+                disbursements = tool_use.get("disbursements", {})
+                if disbursements and disbursements.get("total_disbursed"):
+                    lines.append(f"\n**💸 TOTAL DISBURSED TO OWNER: ${disbursements['total_disbursed']:.2f}**")
+
+                # SUMMARY
+                summary = tool_use.get("summary", {})
+                if summary:
+                    lines.append("\n**📊 PM SUMMARY:**")
+                    if summary.get("opening_balance") is not None:
+                        lines.append(f"  - Opening Balance: ${summary['opening_balance']:.2f}")
+                    if summary.get("closing_balance") is not None:
+                        lines.append(f"  - Closing Balance: ${summary['closing_balance']:.2f}")
 
         return "\n".join(lines)
 

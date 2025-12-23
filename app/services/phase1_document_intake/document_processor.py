@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import traceback
 import uuid
 from typing import Dict, List, Optional, Tuple
 
@@ -62,6 +63,10 @@ FINANCIAL_DOCUMENT_TYPES = {
     "maintenance_invoice",
     "depreciation_schedule",
     "resident_society",
+    # Client-prepared summaries (rental workbooks, expense trackers)
+    "personal_expense_claims",
+    "rental_expense_summary",
+    "rental_summary",  # Owner-prepared rental property income/expense summary
 }
 
 # Document types that may need batch processing (many transactions/pages)
@@ -205,6 +210,7 @@ class DocumentProcessor:
                     document_summaries.append(summary)
                 except Exception as e:
                     logger.error(f"Error analyzing document {original_filename}: {e}")
+                    logger.error(f"Full traceback:\n{traceback.format_exc()}")
                     # Create error summary
                     error_summary = DocumentSummary(
                         document_id=document.id,
@@ -478,6 +484,7 @@ class DocumentProcessor:
                     document_summaries.append(summary)
                 except Exception as e:
                     logger.error(f"Error analyzing document {original_filename}: {e}")
+                    logger.error(f"Full traceback:\n{traceback.format_exc()}")
                     error_summary = DocumentSummary(
                         document_id=document.id,
                         filename=original_filename,
@@ -616,6 +623,154 @@ class DocumentProcessor:
             await db.rollback()
             raise
 
+    def _parse_csv_transactions(self, text_content: str, document_type: str) -> dict:
+        """
+        Parse transactions directly from CSV content without sending to Claude.
+        More efficient for large CSV files and avoids token limits.
+        """
+        import csv
+        import io
+        from datetime import datetime
+
+        lines = text_content.strip().split('\n')
+        transactions = []
+        account_info = {}
+        statement_period = {}
+
+        # Parse header info (first few lines before the data)
+        header_row_idx = None
+        for i, line in enumerate(lines[:10]):
+            line_lower = line.lower()
+            if 'bank' in line_lower and 'branch' in line_lower:
+                # Parse bank info: "Bank 12; Branch 3147; Account 0465092-00 (Streamline)"
+                parts = line.split(';')
+                if len(parts) >= 3:
+                    account_info['bank_name'] = 'ASB Bank'  # Default for now
+                    account_part = parts[2].strip()
+                    if '(' in account_part:
+                        acc_num = account_part.split('(')[0].replace('Account', '').strip()
+                        acc_name = account_part.split('(')[1].replace(')', '').strip()
+                        account_info['account_number'] = acc_num
+                        account_info['account_name'] = acc_name
+            elif 'from date' in line_lower:
+                date_str = line.split()[-1].strip(',')
+                if len(date_str) == 8:  # YYYYMMDD format
+                    statement_period['start_date'] = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
+            elif 'to date' in line_lower:
+                date_str = line.split()[-1].strip(',')
+                if len(date_str) == 8:
+                    statement_period['end_date'] = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
+            elif 'ledger balance' in line_lower:
+                # "Ledger Balance : 1674.23 as of 20250525"
+                parts = line.split(':')
+                if len(parts) >= 2:
+                    balance_part = parts[1].strip().split()[0]
+                    try:
+                        statement_period['closing_balance'] = float(balance_part)
+                    except ValueError:
+                        pass
+            elif 'date' in line_lower and 'amount' in line_lower:
+                header_row_idx = i
+                break
+
+        if header_row_idx is None:
+            logger.warning("Could not find CSV header row")
+            return {}
+
+        # Parse transactions - FileHandler converts CSV to tab-separated
+        csv_text = '\n'.join(lines[header_row_idx:])
+        # Use tab as delimiter since FileHandler converts CSV to TSV
+        reader = csv.DictReader(io.StringIO(csv_text), delimiter='\t')
+
+        for row in reader:
+            # Skip empty rows
+            if not any(row.values()):
+                continue
+
+            date_str = row.get('Date', '').strip()
+            if not date_str:
+                continue
+
+            amount_str = row.get('Amount', '0').strip()
+            try:
+                amount = float(amount_str.replace(',', ''))
+            except ValueError:
+                continue
+
+            description = row.get('Memo', '') or row.get('Payee', '') or ''
+            payee = row.get('Payee', '').strip()
+            tran_type = row.get('Tran Type', '').strip()
+
+            # Determine transaction type
+            if amount >= 0:
+                transaction_type = 'credit'
+            else:
+                transaction_type = 'debit'
+                amount = abs(amount)
+
+            # Suggest category based on transaction type code (must match schema enum)
+            suggested_category = 'unknown'
+            if tran_type == 'LOAN INT':
+                suggested_category = 'interest_debit' if transaction_type == 'debit' else 'interest_credit'
+            elif tran_type == 'LOAN PRIN':
+                suggested_category = 'principal_repayment'
+            elif 'rent' in description.lower():
+                suggested_category = 'rental_income'
+            elif tran_type in ('A/P', 'D/D', 'BILLPAY'):
+                suggested_category = 'transfer_between_accounts'
+            elif 'insurance' in description.lower():
+                suggested_category = 'landlord_insurance'
+            elif 'rates' in description.lower() or 'council' in description.lower():
+                suggested_category = 'council_rates'
+            elif 'water' in description.lower():
+                suggested_category = 'water_rates'
+
+            transactions.append({
+                'date': date_str,
+                'description': f"{payee} - {description}".strip(' -'),
+                'amount': amount,
+                'transaction_type': transaction_type,
+                'other_party': payee,
+                'categorization': {
+                    'suggested_category': suggested_category,
+                    'confidence': 0.7,
+                },
+                'review_flags': {
+                    'needs_review': suggested_category == 'unknown',
+                    'reasons': [] if suggested_category != 'unknown' else ['uncategorized'],
+                    'severity': 'low',
+                },
+            })
+
+        logger.info(f"CSV direct parse: {len(transactions)} transactions extracted")
+
+        # Calculate totals
+        total_credits = sum(t['amount'] for t in transactions if t['transaction_type'] == 'credit')
+        total_debits = sum(t['amount'] for t in transactions if t['transaction_type'] == 'debit')
+
+        # Add required fields with defaults
+        account_info.setdefault('bank_name', 'Unknown Bank')
+        account_info.setdefault('account_number', 'Unknown')
+        account_info.setdefault('account_type', 'transaction')
+        account_info.setdefault('is_joint_account', False)
+        account_info.setdefault('is_rental_dedicated', False)
+
+        statement_period.setdefault('opening_balance', 0.0)
+        statement_period.setdefault('closing_balance', 0.0)
+        statement_period.setdefault('tax_year', 'FY25')
+
+        return {
+            'account_info': account_info,
+            'statement_period': statement_period,
+            'transactions': transactions,
+            'summary': {
+                'total_credits': total_credits,
+                'total_debits': total_debits,
+                'net_change': total_credits - total_debits,
+                'transaction_count': len(transactions),
+            }
+        }
+
     async def _analyze_document(
         self, db: AsyncSession, document: Document, original_filename: str, context: dict,
         progress_tracker=None
@@ -738,112 +893,131 @@ class DocumentProcessor:
             tool_use_extraction = batch_results
 
         elif is_financial_doc and settings.ENABLE_TOOL_USE:
-            # Financial document (any size) - use Tool Use for structured extraction
-            extraction_tool = get_extraction_tool_for_document_type(classification.document_type)
-            if extraction_tool:
-                logger.info(
-                    f"Using Tool Use extraction for {classification.document_type}: {original_filename}"
-                )
-                try:
-                    if progress_tracker:
-                        await progress_tracker.emit(
-                            "extracting_batch",
-                            f"Extracting {classification.document_type} data...",
-                            detail=original_filename,
-                            sub_progress=0.5,
-                        )
-
-                    tool_use_extraction = await self.claude_client.analyze_document_with_tool_use(
-                        processed.text_content,
-                        image_data,
-                        context,
-                        extraction_tool,
-                    )
-
-                    # Store the structured extraction in key_details
+            # Check if this is a CSV file - parse directly instead of sending to Claude
+            if original_filename.lower().endswith('.csv') and processed.text_content:
+                logger.info(f"Parsing CSV directly for {classification.document_type}: {original_filename}")
+                csv_extraction = self._parse_csv_transactions(processed.text_content, classification.document_type)
+                if csv_extraction and csv_extraction.get("transactions"):
+                    tool_use_extraction = csv_extraction
                     classification.key_details["tool_use_extraction"] = tool_use_extraction
-                    classification.key_details["extraction_schema"] = extraction_tool["name"]
+                    classification.key_details["extraction_schema"] = "csv_direct_parse"
+                    all_transactions = tool_use_extraction.get("transactions", [])
+                    classification.key_details["transaction_analysis"] = {
+                        "transactions": all_transactions,
+                        "total_extracted": len(all_transactions),
+                        "pages_processed": 1,
+                    }
+                    logger.info(f"CSV parsing complete: {len(all_transactions)} transactions extracted")
 
-                    # Extract transactions if present in the tool output
-                    if "transactions" in tool_use_extraction:
-                        all_transactions = tool_use_extraction.get("transactions", [])
-                        classification.key_details["transaction_analysis"] = {
-                            "transactions": all_transactions,
-                            "total_extracted": len(all_transactions),
-                            "pages_processed": total_pages,
-                        }
-
+            # Financial document (any size) - use Tool Use for structured extraction
+            if not tool_use_extraction:
+                extraction_tool = get_extraction_tool_for_document_type(classification.document_type)
+                if extraction_tool:
                     logger.info(
-                        f"Tool Use extraction complete for {classification.document_type}"
+                        f"Using Tool Use extraction for {classification.document_type}: {original_filename}"
                     )
+                    try:
+                        if progress_tracker:
+                            await progress_tracker.emit(
+                                "extracting_batch",
+                                f"Extracting {classification.document_type} data...",
+                                detail=original_filename,
+                                sub_progress=0.5,
+                            )
 
-                    # Run extraction validation if enabled
-                    if settings.ENABLE_EXTRACTION_VERIFICATION:
-                        validator = get_extraction_validator(self.claude_client)
-                        validation_result = await validator.validate_extraction(
-                            document_type=classification.document_type,
-                            extracted_data=tool_use_extraction,
-                            document_content=processed.text_content,
-                            image_data=image_data,
-                            context=context,
-                            run_verification_pass=True,
+                        tool_use_extraction = await self.claude_client.analyze_document_with_tool_use(
+                            processed.text_content,
+                            image_data,
+                            context,
+                            extraction_tool,
                         )
 
-                        # Store validation results
-                        classification.key_details["validation"] = validation_result.to_dict()
+                        # Store the structured extraction in key_details
+                        classification.key_details["tool_use_extraction"] = tool_use_extraction
+                        classification.key_details["extraction_schema"] = extraction_tool["name"]
 
-                        if not validation_result.is_valid:
-                            logger.warning(
-                                f"Extraction validation failed for {original_filename}: "
-                                f"{len(validation_result.issues)} issues found"
+                        # Extract transactions if present in the tool output
+                        if "transactions" in tool_use_extraction:
+                            all_transactions = tool_use_extraction.get("transactions", [])
+                            classification.key_details["transaction_analysis"] = {
+                                "transactions": all_transactions,
+                                "total_extracted": len(all_transactions),
+                                "pages_processed": total_pages,
+                            }
+
+                        logger.info(
+                            f"Tool Use extraction complete for {classification.document_type}"
+                        )
+
+                        # Run extraction validation if enabled
+                        if settings.ENABLE_EXTRACTION_VERIFICATION:
+                            validator = get_extraction_validator(self.claude_client)
+                            validation_result = await validator.validate_extraction(
+                                document_type=classification.document_type,
+                                extracted_data=tool_use_extraction,
+                                document_content=processed.text_content,
+                                image_data=image_data,
+                                context=context,
+                                run_verification_pass=True,
                             )
-                            classification.flags.append("extraction_validation_failed")
 
-                            # If there are suggested corrections, attempt to merge them
-                            if validation_result.suggested_corrections:
-                                logger.info(
-                                    f"Applying {len(validation_result.suggested_corrections)} "
-                                    f"suggested corrections from verification pass"
+                            # Store validation results
+                            classification.key_details["validation"] = validation_result.to_dict()
+
+                            if not validation_result.is_valid:
+                                logger.warning(
+                                    f"Extraction validation failed for {original_filename}: "
+                                    f"{len(validation_result.issues)} issues found"
                                 )
-                                existing_txns = tool_use_extraction.get("transactions", [])
-                                for correction in validation_result.suggested_corrections:
-                                    existing_txns.append({
-                                        "date": correction.get("date"),
-                                        "description": correction.get("description"),
-                                        "amount": correction.get("amount"),
-                                        "transaction_type": correction.get("transaction_type"),
-                                        "categorization": {
-                                            "suggested_category": correction.get("suggested_category", "unknown"),
-                                            "confidence": 0.7,
-                                            "is_deductible": True,
-                                        },
-                                        "review_flags": {
-                                            "needs_review": True,
-                                            "reasons": ["added_by_verification_pass"],
-                                            "severity": "info",
-                                        },
-                                    })
-                                tool_use_extraction["transactions"] = existing_txns
+                                classification.flags.append("extraction_validation_failed")
 
-                        if validation_result.reconciliation:
-                            classification.key_details["reconciliation"] = validation_result.reconciliation
-                            if not validation_result.reconciliation.get("is_reconciled"):
-                                classification.flags.append("balance_not_reconciled")
+                                # If there are suggested corrections, attempt to merge them
+                                if validation_result.suggested_corrections:
+                                    logger.info(
+                                        f"Applying {len(validation_result.suggested_corrections)} "
+                                        f"suggested corrections from verification pass"
+                                    )
+                                    existing_txns = tool_use_extraction.get("transactions", [])
+                                    for correction in validation_result.suggested_corrections:
+                                        existing_txns.append({
+                                            "date": correction.get("date"),
+                                            "description": correction.get("description"),
+                                            "amount": correction.get("amount"),
+                                            "transaction_type": correction.get("transaction_type"),
+                                            "categorization": {
+                                                "suggested_category": correction.get("suggested_category", "unknown"),
+                                                "confidence": 0.7,
+                                                "is_deductible": True,
+                                            },
+                                            "review_flags": {
+                                                "needs_review": True,
+                                                "reasons": ["added_by_verification_pass"],
+                                                "severity": "info",
+                                            },
+                                        })
+                                    tool_use_extraction["transactions"] = existing_txns
 
-                except Exception as e:
-                    logger.warning(f"Tool Use extraction failed, using standard extraction: {e}")
-                    # Fall back to standard extraction (already done above)
+                            if validation_result.reconciliation:
+                                classification.key_details["reconciliation"] = validation_result.reconciliation
+                                if not validation_result.reconciliation.get("is_reconciled"):
+                                    classification.flags.append("balance_not_reconciled")
+
+                    except Exception as e:
+                        logger.warning(f"Tool Use extraction failed, using standard extraction: {e}")
+                        # Fall back to standard extraction (already done above)
 
         elif transaction_analysis:
             all_transactions = transaction_analysis.get("transactions", [])
 
         # Flag transactions that need review
         if transaction_analysis or all_transactions:
-            flagged_transactions = [t for t in all_transactions if t.get("needs_review")]
+            # Filter to only dict transactions (skip any malformed string entries)
+            valid_transactions = [t for t in all_transactions if isinstance(t, dict)]
+            flagged_transactions = [t for t in valid_transactions if t.get("needs_review")]
             flagged_count = len(flagged_transactions)
             if flagged_count > 0:
                 classification.flags.append(f"flagged_transactions_{flagged_count}")
-            if any(t.get("requires_invoice") for t in all_transactions):
+            if any(t.get("requires_invoice") for t in valid_transactions):
                 classification.flags.append("requires_source_documents")
 
         # Update document record
@@ -1063,6 +1237,43 @@ class DocumentProcessor:
             await db.refresh(client)
 
         return client
+
+    def _document_has_extraction_failure(self, document: Document) -> bool:
+        """
+        Check if a document has extraction failures that warrant re-processing.
+
+        Returns True if the document has flags indicating extraction failed,
+        such as balance_not_reconciled, extraction_validation_failed, or
+        zero transactions extracted for a financial document.
+        """
+        if not document.extracted_data:
+            return True  # No data = failed
+
+        flags = document.extracted_data.get("flags", [])
+        failure_flags = {
+            "extraction_validation_failed",
+            "balance_not_reconciled",
+            "extraction_failed",
+            "verification_failed",
+        }
+
+        # Check for explicit failure flags
+        for flag in flags:
+            if any(f in flag.lower() for f in failure_flags):
+                return True
+
+        # Check for zero transactions in financial documents
+        financial_types = {"bank_statement", "loan_statement", "property_manager_statement"}
+        if document.document_type in financial_types:
+            transactions = document.extracted_data.get("transactions", [])
+            key_details = document.extracted_data.get("key_details", {})
+            reconciliation = key_details.get("reconciliation", {})
+
+            # If it's a financial doc with no transactions and a balance variance, it failed
+            if len(transactions) == 0 and reconciliation.get("variance", 0) > 1:
+                return True
+
+        return False
 
     async def _check_for_duplicates(
         self,
@@ -1372,12 +1583,36 @@ class DocumentProcessor:
                 await db.refresh(document)
 
                 if dup_info.is_duplicate and dup_info.duplicate_type == "content":
-                    # Same content - skip analysis, use existing document's data
-                    duplicate_documents.append((document, file.filename, dup_info))
-                    logger.warning(
-                        f"Skipping duplicate document: '{file.filename}' has same content as "
-                        f"'{dup_info.original_filename}' - transactions already extracted"
-                    )
+                    # Same content - check if original failed extraction
+                    should_reprocess = False
+                    if dup_info.original_document_id:
+                        result = await db.execute(
+                            select(Document).where(Document.id == dup_info.original_document_id)
+                        )
+                        original_doc = result.scalar_one_or_none()
+                        if original_doc and self._document_has_extraction_failure(original_doc):
+                            should_reprocess = True
+                            logger.info(
+                                f"Original document '{dup_info.original_filename}' has extraction failures - "
+                                f"allowing re-processing of '{file.filename}'"
+                            )
+                            # Mark new document as not a duplicate since we're re-processing
+                            document.is_duplicate = False
+                            document.duplicate_of_id = None
+                            await db.commit()
+
+                    if should_reprocess:
+                        # Re-process the failed document
+                        upload_hashes[content_hash] = document
+                        upload_filenames[file.filename] = document
+                        saved_files.append((document, file.filename, dup_info))
+                    else:
+                        # Original extraction succeeded - skip
+                        duplicate_documents.append((document, file.filename, dup_info))
+                        logger.warning(
+                            f"Skipping duplicate document: '{file.filename}' has same content as "
+                            f"'{dup_info.original_filename}' - transactions already extracted"
+                        )
                 else:
                     # New document or different content - analyze it
                     upload_hashes[content_hash] = document
@@ -1410,6 +1645,7 @@ class DocumentProcessor:
                 document_summaries.append(summary)
             except Exception as e:
                 logger.error(f"Error analyzing document {original_filename}: {e}")
+                logger.error(f"Full traceback:\n{traceback.format_exc()}")
                 error_summary = DocumentSummary(
                     document_id=document.id,
                     filename=original_filename,

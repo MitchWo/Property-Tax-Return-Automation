@@ -51,6 +51,7 @@ class FlagCategory(str, Enum):
     REVIEW_REQUIRED = "review_required"
     ANOMALY = "anomaly"
     INVOICE_REQUIRED = "invoice_required"
+    DOCUMENTATION_REQUIRED = "documentation_required"  # General documentation needed
     VERIFICATION = "verification"
     DATA_QUALITY = "data_quality"
     COMPLIANCE = "compliance"
@@ -88,11 +89,11 @@ class CalculationLogic(BaseModel):
     """Detailed calculation logic for audit trail."""
 
     # Primary source
-    primary_source_code: str  # BS, SS, PM, etc.
-    primary_source_name: str  # Human-readable source name
+    primary_source_code: Optional[str] = None  # BS, SS, PM, etc.
+    primary_source_name: Optional[str] = None  # Human-readable source name
 
     # Calculation method
-    calculation_method: str  # e.g., "Sum of 12 monthly rent deposits"
+    calculation_method: Optional[str] = None  # e.g., "Sum of 12 monthly rent deposits"
     formula: Optional[str] = None  # e.g., "=SUM(Bank!D10:D21)"
 
     # All source references used
@@ -118,11 +119,11 @@ class WorkingsTransaction(BaseModel):
 
     transaction_id: Optional[UUID] = None
     date: Optional[datetime.date] = None
-    description: str
+    description: Optional[str] = None
     amount: Decimal
     other_party: Optional[str] = None
-    source_document: str  # e.g., "Bank Statement", "PM Statement"
-    source_code: str = "BS"  # Source reference code
+    source_document: Optional[str] = None  # e.g., "Bank Statement", "PM Statement"
+    source_code: Optional[str] = "BS"  # Source reference code
     source_document_id: Optional[UUID] = None
     line_reference: Optional[str] = None  # Row/page reference in source
     verification_status: VerificationStatus = VerificationStatus.UNVERIFIED
@@ -139,8 +140,8 @@ class LineItem(BaseModel):
     gross_amount: Decimal
     deductible_percentage: float = 100.0
     deductible_amount: Decimal
-    source: str  # e.g., "PM Statement (Quinovic)", "Bank Statement + Rates Invoice"
-    source_code: str = "BS"  # Primary source code (BS, SS, PM, etc.)
+    source: Optional[str] = None  # e.g., "PM Statement (Quinovic)", "Bank Statement + Rates Invoice"
+    source_code: Optional[str] = "BS"  # Primary source code (BS, SS, PM, etc.)
     verification_status: VerificationStatus = VerificationStatus.UNVERIFIED
     transactions: List[WorkingsTransaction] = Field(default_factory=list)
     notes: Optional[str] = None
@@ -155,10 +156,10 @@ class RepairItem(BaseModel):
 
     transaction_id: Optional[UUID] = None
     date: Optional[datetime.date] = None
-    description: str
+    description: Optional[str] = None
     amount: Decimal
     payee: Optional[str] = None
-    invoice_status: str  # "verified", "missing_required", "missing_optional", "not_required"
+    invoice_status: Optional[str] = None  # "verified", "missing_required", "missing_optional", "not_required"
     invoice_document_id: Optional[UUID] = None
     notes: Optional[str] = None
 
@@ -278,8 +279,8 @@ class WorkingsFlag(BaseModel):
 
     severity: FlagSeverity
     category: FlagCategory
-    message: str
-    action_required: str
+    message: Optional[str] = None
+    action_required: Optional[str] = None
     related_transaction_ids: List[UUID] = Field(default_factory=list)
     related_document_id: Optional[UUID] = None
     related_amount: Optional[Decimal] = None
@@ -288,16 +289,16 @@ class WorkingsFlag(BaseModel):
 class DocumentRequestData(BaseModel):
     """A document request to send to client."""
 
-    document_type: str
-    reason: str
-    priority: str = "required"  # required, recommended
+    document_type: Optional[str] = None
+    reason: Optional[str] = None
+    priority: Optional[str] = "required"  # required, recommended
     details: Optional[str] = None
 
 
 class ClientQuestionData(BaseModel):
     """A question to ask the client."""
 
-    question: str
+    question: Optional[str] = None
     context: Optional[str] = None
     options: List[str] = Field(default_factory=list)
     related_transaction_id: Optional[UUID] = None
@@ -309,7 +310,7 @@ class ClientQuestionData(BaseModel):
 class DocumentStatusData(BaseModel):
     """Status of a document type."""
 
-    status: str  # "received", "partial", "missing", "not_applicable"
+    status: Optional[str] = "missing"  # "received", "partial", "missing", "not_applicable"
     period_covered: Optional[str] = None
     notes: Optional[str] = None
 
@@ -331,9 +332,9 @@ class TaxReturnWorkingsData(BaseModel):
 
     # Tax return info
     tax_return_id: UUID
-    property_address: str
-    tax_year: str
-    property_type: str
+    property_address: Optional[str] = None
+    tax_year: Optional[str] = None
+    property_type: Optional[str] = None
 
     # Summary
     summary: WorkingsSummary

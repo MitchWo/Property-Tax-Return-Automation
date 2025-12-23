@@ -450,6 +450,26 @@ PL_ROW_MAPPINGS = [
         "sort_order": 65
     },
     {
+        "category_code": "accounting_fee",
+        "pl_row": 17,
+        "display_name": "Accounting Fee",
+        "category_group": "Professional Services",
+        "transaction_type": "expense",
+        "is_deductible": True,
+        "default_source": "AF",
+        "sort_order": 66
+    },
+    {
+        "category_code": "accounting_fees",
+        "pl_row": 17,
+        "display_name": "Accounting Fees",
+        "category_group": "Professional Services",
+        "transaction_type": "expense",
+        "is_deductible": True,
+        "default_source": "AF",
+        "sort_order": 67
+    },
+    {
         "category_code": "letting_fee",
         "pl_row": 13,
         "display_name": "Letting Fee",
@@ -594,6 +614,16 @@ PL_ROW_MAPPINGS = [
         "is_deductible": True,
         "default_source": "BS",
         "sort_order": 101
+    },
+    {
+        "category_code": "other_expense",
+        "pl_row": None,
+        "display_name": "Other Expense",
+        "category_group": "Other",
+        "transaction_type": "expense",
+        "is_deductible": True,
+        "default_source": "BS",
+        "sort_order": 102
     },
 
     # =========================================================================
