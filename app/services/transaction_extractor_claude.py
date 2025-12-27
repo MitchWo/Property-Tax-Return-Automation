@@ -4,11 +4,12 @@ import logging
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from app.models.db_models import Document
 from app.schemas.transactions import DocumentExtractionResult, ExtractedTransaction
 from app.services.phase1_document_intake.claude_client import ClaudeClient
+from app.services.phase1_document_intake.file_handler import FileHandler
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ class TransactionExtractorClaude:
 
     def __init__(self):
         self.claude_client = ClaudeClient()
+        self.file_handler = FileHandler()
 
     async def extract_from_document(
         self,
@@ -39,31 +41,49 @@ class TransactionExtractorClaude:
         # Determine document type
         doc_type = document.document_type or "bank_statement"
 
-        # Try to read the file
+        # Try to read the file using FileHandler for proper PDF/image processing
         try:
-            # Use provided file_content if available, otherwise read from disk
-            if file_content:
-                logger.info(f"Using provided file content ({len(file_content)} bytes)")
-                content = file_content.decode('utf-8', errors='ignore')
-            else:
-                file_path = Path(document.file_path)
-                if not file_path.exists():
-                    logger.error(f"File not found: {file_path}")
-                    return DocumentExtractionResult(
-                        document_id=document.id,
-                        document_type=doc_type,
-                        filename=document.original_filename,
-                        transactions=[],
-                        extraction_method="claude_ai",
-                        total_transactions=0,
-                        total_income=Decimal("0"),
-                        total_expenses=Decimal("0"),
-                        errors=[f"File not found: {document.file_path}"],
-                        warnings=[]
-                    )
+            file_path = Path(document.file_path)
+            if not file_path.exists():
+                logger.error(f"File not found: {file_path}")
+                return DocumentExtractionResult(
+                    document_id=document.id,
+                    document_type=doc_type,
+                    filename=document.original_filename,
+                    transactions=[],
+                    extraction_method="claude_ai",
+                    total_transactions=0,
+                    total_income=Decimal("0"),
+                    total_expenses=Decimal("0"),
+                    errors=[f"File not found: {document.file_path}"],
+                    warnings=[]
+                )
 
-                # Read file content
-                content = file_path.read_text(encoding='utf-8', errors='ignore')
+            # Use FileHandler to properly process PDFs, images, etc.
+            processed = await self.file_handler.process_file(
+                str(file_path),
+                document.original_filename
+            )
+
+            content = processed.text_content or ""
+            image_paths = processed.image_paths
+
+            # If we have images (scanned PDF), use vision API
+            if image_paths and not content:
+                logger.info(f"Document is scanned/image-based, using vision extraction for {document.original_filename}")
+                # For now, return empty - vision extraction should happen in Phase 1
+                return DocumentExtractionResult(
+                    document_id=document.id,
+                    document_type=doc_type,
+                    filename=document.original_filename,
+                    transactions=[],
+                    extraction_method="claude_ai",
+                    total_transactions=0,
+                    total_income=Decimal("0"),
+                    total_expenses=Decimal("0"),
+                    errors=[],
+                    warnings=["Document appears to be scanned - transactions should be extracted in Phase 1"]
+                )
 
         except Exception as e:
             logger.error(f"Error reading file {document.file_path}: {e}")

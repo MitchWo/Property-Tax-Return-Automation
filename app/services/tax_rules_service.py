@@ -46,12 +46,26 @@ class TaxRulesService:
 
         Returns:
             Deductibility percentage (0-100)
+
+        NZ Interest Deductibility Rules:
+        - New builds (CCC after 27 March 2020): 100% deductible
+        - Existing properties: 80% (FY25), 100% (FY26+)
+        - Unknown/NOT_SURE: Use conservative 80% for FY25 (safer assumption)
         """
+        # Normalize property type - treat NOT_SURE as existing (conservative)
+        normalized_property_type = property_type.lower() if property_type else "existing"
+        if normalized_property_type in ("not_sure", "unknown", ""):
+            normalized_property_type = "existing"
+            logger.info(
+                f"Property type '{property_type}' unknown, treating as 'existing' "
+                "for interest deductibility (conservative approach)"
+            )
+
         result = await db.execute(
             select(TaxRule).where(
                 TaxRule.rule_type == "interest_deductibility",
                 TaxRule.tax_year == tax_year,
-                TaxRule.property_type == property_type
+                TaxRule.property_type == normalized_property_type
             )
         )
         rule = result.scalar_one_or_none()
@@ -59,12 +73,22 @@ class TaxRulesService:
         if rule:
             return rule.value.get("percentage", 100)
 
-        # Default to 100% if no rule found
+        # Default based on tax year and property type (conservative approach)
+        # Only new_build with confirmed CCC gets 100%, everything else uses year-based defaults
+        if normalized_property_type == "new_build":
+            default_percentage = 100.0
+        elif tax_year in ("FY25", "FY2025"):
+            default_percentage = 80.0  # Existing properties in FY25
+        elif tax_year in ("FY26", "FY2026"):
+            default_percentage = 100.0  # Existing properties in FY26+
+        else:
+            default_percentage = 80.0  # Conservative default
+
         logger.warning(
             f"No interest deductibility rule found for {tax_year}/{property_type}, "
-            "defaulting to 100%"
+            f"using default {default_percentage}% for {normalized_property_type}"
         )
-        return 100.0
+        return default_percentage
 
     async def get_accounting_fee(
         self,

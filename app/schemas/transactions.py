@@ -26,33 +26,6 @@ class CategorizationSource(str, Enum):
     MANUAL = "manual"
 
 
-# Tax Rules
-class TaxRuleBase(BaseModel):
-    """Base tax rule schema."""
-    rule_type: str
-    tax_year: str
-    property_type: str
-    value: Dict[str, Any]
-    notes: Optional[str] = None
-
-
-class TaxRuleCreate(TaxRuleBase):
-    """Schema for creating a tax rule."""
-    effective_from: Optional[date] = None
-    effective_to: Optional[date] = None
-
-
-class TaxRuleResponse(TaxRuleBase):
-    """Schema for tax rule response."""
-    id: UUID
-    effective_from: Optional[date] = None
-    effective_to: Optional[date] = None
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 # P&L Row Mappings
 class PLRowMappingBase(BaseModel):
     """Base P&L row mapping schema."""
@@ -363,21 +336,6 @@ class TaxReturnExtractionResult(BaseModel):
     blocking_issues: List[str] = []
 
 
-# Filter/Query schemas
-class TransactionFilter(BaseModel):
-    """Schema for filtering transactions."""
-    category_codes: Optional[List[str]] = None
-    transaction_types: Optional[List[TransactionTypeEnum]] = None
-    needs_review: Optional[bool] = None
-    manually_reviewed: Optional[bool] = None
-    min_amount: Optional[Decimal] = None
-    max_amount: Optional[Decimal] = None
-    date_from: Optional[date] = None
-    date_to: Optional[date] = None
-    search_description: Optional[str] = None
-    confidence_below: Optional[float] = None  # Filter low confidence
-
-
 class TransactionListResponse(BaseModel):
     """Schema for paginated transaction list."""
     transactions: List[TransactionResponse]
@@ -422,34 +380,3 @@ class InterestSummary(BaseModel):
     interest_frequency: str  # "bi-weekly", "monthly"
     has_offset_account: bool = False
     notes: List[str] = []
-
-
-# Settlement-specific schemas (Year 1)
-class SettlementExtraction(BaseModel):
-    """Schema for settlement statement extraction (Year 1)."""
-    tax_return_id: UUID
-    document_id: UUID
-
-    # Key figures
-    settlement_date: date
-    purchase_price: Decimal
-    deposit: Decimal
-
-    # Apportionments
-    rates_apportionment: Decimal
-    rates_vendor_credit: Optional[Decimal] = None
-    body_corporate_prorate: Optional[Decimal] = None
-    resident_society_prorate: Optional[Decimal] = None
-
-    # Other items
-    legal_fees: Decimal
-    interest_on_deposit: Optional[Decimal] = None  # To net against interest expense
-
-    # Calculated
-    rates_total: Optional[Decimal] = None  # apportionment + instalments - vendor credit
-
-    # Metadata
-    property_address: str
-    vendor_name: Optional[str] = None
-    purchaser_name: Optional[str] = None
-    solicitor: Optional[str] = None

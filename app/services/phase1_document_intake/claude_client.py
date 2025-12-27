@@ -317,7 +317,14 @@ Use the extract_bank_statement tool to provide complete extraction."""
             # Build message content
             content = self._build_message_content(document_content, image_data)
 
-            # Add context to prompt
+            # For text-only documents (CSVs, spreadsheets), use Tool Use for guaranteed JSON
+            if not image_data and document_content:
+                logger.info(f"Using Tool Use classification for text-only document ({len(document_content)} chars)")
+                return await self._classify_text_document_with_tool_use(
+                    document_content, context, transaction_learnings
+                )
+
+            # Add context to prompt for image-based documents
             system_prompt = DOCUMENT_CLASSIFICATION_PROMPT.format(
                 client_name=context.get("client_name", ""),
                 property_address=context.get("property_address", ""),
@@ -357,13 +364,51 @@ Use the extract_bank_statement tool to provide complete extraction."""
             elif "```" in response_text:
                 response_text = response_text.split("```")[1].split("```")[0].strip()
 
+            # Try to extract JSON from response if it contains extra text
+            response_text = response_text.strip()
+            if not response_text.startswith("{"):
+                # Try to find JSON object in the response
+                start_idx = response_text.find("{")
+                if start_idx != -1:
+                    # Find the matching closing brace
+                    brace_count = 0
+                    end_idx = start_idx
+                    for i, char in enumerate(response_text[start_idx:], start_idx):
+                        if char == "{":
+                            brace_count += 1
+                        elif char == "}":
+                            brace_count -= 1
+                            if brace_count == 0:
+                                end_idx = i + 1
+                                break
+                    response_text = response_text[start_idx:end_idx]
+
             classification_data = json.loads(response_text)
+
+            # Normalize flags - Claude sometimes returns dicts instead of strings
+            if "flags" in classification_data and isinstance(classification_data["flags"], list):
+                normalized_flags = []
+                for flag in classification_data["flags"]:
+                    if isinstance(flag, str):
+                        normalized_flags.append(flag)
+                    elif isinstance(flag, dict):
+                        # Convert dict to string representation
+                        flag_type = flag.get("type", flag.get("flag_code", "unknown"))
+                        flag_msg = flag.get("message", flag.get("description", ""))
+                        if flag_msg:
+                            normalized_flags.append(f"{flag_type}: {flag_msg}")
+                        else:
+                            normalized_flags.append(flag_type)
+                    else:
+                        normalized_flags.append(str(flag))
+                classification_data["flags"] = normalized_flags
 
             return DocumentClassification(**classification_data)
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse Claude response as JSON: {e}")
             logger.error(f"Response was: {response_text if 'response_text' in locals() else 'N/A'}")
+            logger.error(f"Original response: {response.content[0].text if 'response' in locals() else 'N/A'}")
             # Return a fallback classification
             return DocumentClassification(
                 document_type="other",
@@ -373,8 +418,95 @@ Use the extract_bank_statement tool to provide complete extraction."""
                 key_details={},
             )
         except Exception as e:
+            import traceback
             logger.error(f"Error analyzing document: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
             raise
+
+    async def _classify_text_document_with_tool_use(
+        self,
+        document_content: str,
+        context: Dict[str, Any],
+        transaction_learnings: Optional[List[Dict[str, Any]]] = None,
+    ) -> DocumentClassification:
+        """
+        Classify text-only documents (CSV, spreadsheets) using Tool Use for guaranteed JSON.
+        """
+        try:
+            system_prompt = f"""You are an expert document classifier for New Zealand rental property tax returns (IR3R).
+
+Property Context:
+- Client Name: {context.get('client_name', '')}
+- Property Address: {context.get('property_address', '')}
+- Tax Year: {context.get('tax_year', '')}
+- Property Type: {context.get('property_type', '')}
+
+DOCUMENT TYPES:
+- bank_statement: Bank account transactions (look for bank name, account number, credits/debits)
+- loan_statement: Mortgage/loan transactions (look for LOAN INTEREST, LOAN PRINCIPAL, loan account numbers)
+- property_manager_statement: PM statements with rent collected, management fees
+- settlement_statement: Property purchase/sale settlement
+- rates: Council rates
+- water_rates: Water charges
+- body_corporate: BC levies
+- maintenance_invoice: Repair invoices
+- personal_expense_claims: Personal expense claims spreadsheet
+- other: Doesn't fit categories
+- invalid: Not relevant to rental property
+
+IMPORTANT: This is TEXT/CSV content, not an image. Analyze the data structure and content.
+If you see LOAN INTEREST or LOAN PRINCIPAL transactions, this is likely a bank_statement that includes loan debits, NOT a dedicated loan_statement.
+A true loan_statement would show loan balance, interest rate, and loan-specific details only.
+
+Use the classify_document tool to provide your classification."""
+
+            content = [{"type": "text", "text": f"Document content:\n\n{document_content}"}]
+
+            response = await self._call_with_retry(
+                lambda: self.client.messages.create(
+                    model=self.model,
+                    max_tokens=4096,
+                    temperature=0.1,
+                    system=system_prompt,
+                    tools=[DOCUMENT_CLASSIFICATION_TOOL],
+                    tool_choice={"type": "tool", "name": "classify_document"},
+                    messages=[{"role": "user", "content": content}],
+                )
+            )
+
+            # Extract tool use response
+            for block in response.content:
+                if hasattr(block, 'type') and block.type == "tool_use":
+                    if block.name == "classify_document":
+                        tool_result = block.input
+                        # Convert tool result to DocumentClassification
+                        return DocumentClassification(
+                            document_type=tool_result.get("document_type", "other"),
+                            confidence=tool_result.get("confidence", 0.5),
+                            reasoning=tool_result.get("reasoning", "Classified via Tool Use"),
+                            flags=tool_result.get("key_identifiers", {}).get("flags", []),
+                            key_details=tool_result.get("key_identifiers", {}),
+                        )
+
+            # Fallback if no tool use found
+            logger.warning("No tool use response found for text document classification")
+            return DocumentClassification(
+                document_type="other",
+                confidence=0.3,
+                reasoning="Tool use classification did not return expected format",
+                flags=["classification_warning"],
+                key_details={},
+            )
+
+        except Exception as e:
+            logger.error(f"Error in text document classification with Tool Use: {e}")
+            return DocumentClassification(
+                document_type="other",
+                confidence=0.0,
+                reasoning=f"Classification error: {str(e)}",
+                flags=["classification_error"],
+                key_details={},
+            )
 
     async def extract_with_prompt(self, prompt: str) -> str:
         """

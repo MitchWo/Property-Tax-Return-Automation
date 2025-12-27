@@ -19,14 +19,10 @@ from app.schemas.transactions import (
     InterestSummary,
     InterestTransaction,
     PLRowMappingResponse,
-    SettlementExtraction,
     TaxReturnExtractionResult,
-    TaxRuleCreate,
-    TaxRuleResponse,
     TransactionBase,
     TransactionBulkUpdate,
     TransactionCreate,
-    TransactionFilter,
     TransactionListResponse,
     TransactionPatternCreate,
     TransactionPatternResponse,
@@ -37,7 +33,7 @@ from app.schemas.transactions import (
 )
 
 __all__ = [
-    # Documents (existing)
+    # Documents
     "ProcessedFile",
     "DocumentClassification",
     "DocumentAnalysis",
@@ -46,11 +42,9 @@ __all__ = [
     "TaxReturnCreate",
     "TaxReturnResponse",
     "DocumentResponse",
-    # Transactions (new)
+    # Transactions
     "TransactionTypeEnum",
     "CategorizationSource",
-    "TaxRuleCreate",
-    "TaxRuleResponse",
     "PLRowMappingResponse",
     "TransactionBase",
     "TransactionCreate",
@@ -65,9 +59,7 @@ __all__ = [
     "ExtractedTransaction",
     "DocumentExtractionResult",
     "TaxReturnExtractionResult",
-    "TransactionFilter",
     "TransactionListResponse",
     "InterestTransaction",
     "InterestSummary",
-    "SettlementExtraction",
 ]

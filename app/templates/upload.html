@@ -353,8 +353,15 @@
     </div>
 
     <!-- Processing Progress Overlay -->
-    <div x-show="isSubmitting" x-cloak
-         class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+    <div x-show="isSubmitting"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[9999]"
+         style="display: none;">
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
             <!-- Header -->
             <div class="bg-primary px-6 py-4">

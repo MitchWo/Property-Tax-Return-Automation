@@ -80,6 +80,11 @@ class ExtractionValidator:
             transactions = extracted_data.get("transactions", [])
             summary = extracted_data.get("summary", {})
 
+            # Also validate interest_analysis if present
+            interest_analysis = extracted_data.get("interest_analysis", {})
+            if interest_analysis:
+                self._validate_interest_analysis(interest_analysis, extracted_data)
+
             opening_balance = Decimal(str(statement_period.get("opening_balance", 0)))
             closing_balance = Decimal(str(statement_period.get("closing_balance", 0)))
 
@@ -139,6 +144,60 @@ class ExtractionValidator:
         except Exception as e:
             logger.error(f"Balance reconciliation error: {e}")
             return False, {"error": str(e), "is_reconciled": False}
+
+    def _validate_interest_analysis(
+        self,
+        interest_analysis: Dict[str, Any],
+        extracted_data: Dict[str, Any]
+    ) -> None:
+        """
+        Validate that interest_analysis totals match the sum of monthly_breakdown.
+
+        If there's a discrepancy, correct the total_interest_debits to match
+        the actual sum of the monthly breakdown (which is derived from transactions).
+        """
+        monthly_breakdown = interest_analysis.get("monthly_breakdown", {})
+        stated_total = Decimal(str(interest_analysis.get("total_interest_debits", 0)))
+
+        if not monthly_breakdown:
+            return
+
+        # Calculate actual sum from monthly breakdown
+        actual_sum = sum(Decimal(str(v)) for v in monthly_breakdown.values())
+        variance = abs(stated_total - actual_sum)
+
+        if variance > self.BALANCE_TOLERANCE:
+            logger.warning(
+                f"Interest analysis mismatch: stated={stated_total:.2f}, "
+                f"monthly_sum={actual_sum:.2f}, variance={variance:.2f}. "
+                f"Correcting total_interest_debits to match monthly breakdown."
+            )
+            # Correct the value in-place
+            interest_analysis["total_interest_debits"] = float(actual_sum)
+            interest_analysis["_original_stated_total"] = float(stated_total)
+            interest_analysis["_correction_applied"] = True
+            interest_analysis["_correction_variance"] = float(variance)
+
+        # Also validate against actual transaction sum
+        transactions = extracted_data.get("transactions", [])
+        if transactions:
+            txn_interest_sum = Decimal("0")
+            for txn in transactions:
+                desc = txn.get("description", "").upper()
+                txn_type = txn.get("transaction_type", "")
+                if "LOAN" in desc and "INT" in desc and txn_type == "debit":
+                    txn_interest_sum += abs(Decimal(str(txn.get("amount", 0))))
+
+            txn_variance = abs(actual_sum - txn_interest_sum)
+            if txn_variance > self.BALANCE_TOLERANCE:
+                logger.warning(
+                    f"Interest analysis vs transactions mismatch: "
+                    f"monthly_sum={actual_sum:.2f}, txn_sum={txn_interest_sum:.2f}, "
+                    f"variance={txn_variance:.2f}"
+                )
+                # Use transaction sum as the source of truth
+                interest_analysis["total_interest_debits"] = float(txn_interest_sum)
+                interest_analysis["_transaction_derived"] = True
 
     def reconcile_loan_statement(
         self,
