@@ -7,25 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.db_models import PropertyType, local_now
-
-
-class TaxReturnStatus(str, Enum):
-    """Tax return status enumeration."""
-
-    PENDING = "pending"
-    COMPLETE = "complete"
-    INCOMPLETE = "incomplete"
-    BLOCKED = "blocked"
-
-
-class DocumentStatus(str, Enum):
-    """Document status enumeration."""
-
-    PENDING = "pending"
-    CLASSIFIED = "classified"
-    VERIFIED = "verified"
-    ERROR = "error"
+from app.models.db_models import DocumentStatus, PropertyType, TaxReturnStatus, local_now
 
 
 class DocumentType(str, Enum):
