@@ -29,6 +29,7 @@ DOCUMENT_CLASSIFICATION_TOOL = {
                     "maintenance_invoice",
                     "resident_society",
                     "personal_expense_claims",
+                    "personal_expenditure_claims",
                     "other",
                     "invalid"
                 ],
@@ -1419,6 +1420,100 @@ RENTAL_SUMMARY_EXTRACTION_TOOL = {
 }
 
 
+# Personal Expenditure Claims Extraction Tool (Lighthouse template for home office, mobile, mileage)
+PERSONAL_EXPENDITURE_CLAIMS_EXTRACTION_TOOL = {
+    "name": "extract_personal_expenditure_claims",
+    "description": "Extract personal expense deductions from Lighthouse Personal Expenditure Claims spreadsheet (home office, mobile phone, mileage)",
+    "input_schema": {
+        "type": "object",
+        "required": ["tax_year"],
+        "properties": {
+            "tax_year": {
+                "type": "string",
+                "description": "Tax year (e.g., 'FY25' from '31 March 2025')"
+            },
+            "home_office": {
+                "type": "object",
+                "description": "Home office deduction details",
+                "properties": {
+                    "house_area_sqm": {
+                        "type": ["number", "null"],
+                        "description": "Total house area in square meters"
+                    },
+                    "office_area_sqm": {
+                        "type": ["number", "null"],
+                        "description": "Area used for business in square meters"
+                    },
+                    "business_use_percentage": {
+                        "type": ["number", "null"],
+                        "description": "Calculated business use percentage (0-100)"
+                    },
+                    "expenses": {
+                        "type": "object",
+                        "properties": {
+                            "power": {"type": ["number", "null"]},
+                            "rent": {"type": ["number", "null"]},
+                            "insurance": {"type": ["number", "null"]},
+                            "home_loan_interest": {"type": ["number", "null"]},
+                            "rates": {"type": ["number", "null"]},
+                            "rubbish_removal": {"type": ["number", "null"]},
+                            "telephone_line_rental": {"type": ["number", "null"]}
+                        }
+                    },
+                    "total_expenses": {
+                        "type": ["number", "null"],
+                        "description": "Total of all home expenses"
+                    },
+                    "claim_amount": {
+                        "type": ["number", "null"],
+                        "description": "Final home office claim (total_expenses × business_use_percentage)"
+                    }
+                }
+            },
+            "mobile_phone": {
+                "type": "object",
+                "description": "Mobile phone deduction details",
+                "properties": {
+                    "annual_expense": {
+                        "type": ["number", "null"],
+                        "description": "Total mobile expense for the year"
+                    },
+                    "claim_amount": {
+                        "type": ["number", "null"],
+                        "description": "50% tax deductible amount"
+                    }
+                }
+            },
+            "mileage": {
+                "type": "object",
+                "description": "Vehicle mileage deduction details",
+                "properties": {
+                    "kilometres_travelled": {
+                        "type": ["number", "null"],
+                        "description": "Business kilometres travelled"
+                    },
+                    "claim_amount": {
+                        "type": ["number", "null"],
+                        "description": "Mileage claim (km × IRD rate $0.99/km)"
+                    }
+                }
+            },
+            "flags": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "flag_code": {"type": "string"},
+                        "severity": {"type": "string", "enum": ["critical", "warning", "info"]},
+                        "message": {"type": "string"}
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 def get_extraction_tool_for_document_type(document_type: str) -> dict:
     """Get the appropriate Tool Use schema for a document type."""
     TOOL_MAPPING = {
@@ -1439,5 +1534,7 @@ def get_extraction_tool_for_document_type(document_type: str) -> dict:
         # Client-prepared expense summaries (NOT rental property - home office, mileage, etc.)
         "personal_expense_claims": EXPENSE_DOCUMENT_EXTRACTION_TOOL,
         "rental_expense_summary": EXPENSE_DOCUMENT_EXTRACTION_TOOL,
+        # Lighthouse Personal Expenditure Claims template (home office, mobile, mileage)
+        "personal_expenditure_claims": PERSONAL_EXPENDITURE_CLAIMS_EXTRACTION_TOOL,
     }
     return TOOL_MAPPING.get(document_type)

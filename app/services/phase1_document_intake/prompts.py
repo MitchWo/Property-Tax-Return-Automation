@@ -31,6 +31,7 @@ DOCUMENT TYPES:
 | water_rates | Water rates/usage | Water supplier, usage charges |
 | maintenance_invoice | Repair/maintenance receipt | Tradesperson invoice, repair description |
 | personal_expense_claims | Personal/home office deductions | Home office %, mileage, mobile phone claims - NOT for rental property |
+| personal_expenditure_claims | Lighthouse Personal Expenditure Claims | Excel titled "Personal Expenditure Claims" with home office (house area, business use %), mobile phone (50% claim), and mileage (km × rate) sections |
 | resident_society | Resident society levies | Resident society fees, community charges |
 | other | Unclassified relevant document | Related to property but doesn't fit categories |
 | invalid | Not relevant | Personal documents, unrelated items |
@@ -69,16 +70,24 @@ CRITICAL CLASSIFICATION RULES:
    - Property address matches the rental property context
    - This is the owner's workings for their rental property tax return
 
-   Use "personal_expense_claims" when the spreadsheet/document contains:
+   Use "personal_expenditure_claims" (PREFERRED for Lighthouse template) when:
+   - Title is "Personal Expenditure Claims" at the top
+   - Has sections for: House Area/Business Use %, Mobile Expense, Business Kilometres
+   - Contains calculated claims: "Home Office Claim", "50% Tax Deductible Mobile", "Mileage Claim"
+   - This is the Lighthouse Financial template for personal deductions
+
+   Use "personal_expense_claims" when (generic format):
    - Home office deductions (% of house used for business)
    - Personal mileage/travel claims
    - Mobile phone claims
    - Personal residence expenses (owner's home, NOT the rental property)
    - No rental income - only personal deduction claims
+   - NOT the Lighthouse template format
 
    KEY DIFFERENTIATOR: Does it contain RENTAL INCOME?
    - YES → rental_summary
-   - NO (only home office/mileage/personal claims) → personal_expense_claims
+   - NO + Lighthouse template format → personal_expenditure_claims
+   - NO + generic format → personal_expense_claims
 
 EXTRACTION REQUIREMENTS BY TYPE:
 

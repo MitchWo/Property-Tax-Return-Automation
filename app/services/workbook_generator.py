@@ -170,6 +170,12 @@ class WorkbookGenerator:
             pm_sheet = wb.create_sheet(f"{property_short} - PM", sheet_index)
             sheet_index += 1
 
+        # Calculation Logic sheet - audit trail for all P&L items (only if workings available)
+        logic_sheet = None
+        if workings:
+            logic_sheet = wb.create_sheet("Calculation Logic", sheet_index)
+            sheet_index += 1
+
         # Remove default sheet
         if default_sheet and default_sheet.title == "Sheet":
             wb.remove(default_sheet)
@@ -206,6 +212,10 @@ class WorkbookGenerator:
 
         if pm_sheet:
             self._build_pm_statement_sheet(pm_sheet, transactions, tax_return.property_address, tax_return.tax_year)
+
+        # Build calculation logic sheet (audit trail)
+        if logic_sheet:
+            self._build_calculation_logic_sheet(logic_sheet, context)
 
         # Set P&L as active
         wb.active = pl_sheet
@@ -2031,6 +2041,232 @@ class WorkbookGenerator:
             "uncategorized": "Uncategorized",
         }
         return display_names.get(cat, cat.replace("_", " ").title())
+
+    # =========================================================================
+    # CALCULATION LOGIC SHEET
+    # =========================================================================
+
+    def _build_calculation_logic_sheet(self, ws: Worksheet, context: Dict[str, Any]):
+        """
+        Build Calculation Logic sheet showing detailed audit trail for each P&L line item.
+
+        Format: Flat table with one row per P&L item
+        Columns: P&L Row | Category | Gross | Deductible | Source | Calculation Steps | Validation
+        """
+        workings: TaxReturnWorkingsData = context["workings"]
+        tax_return = context["tax_return"]
+
+        # Set column widths
+        ws.column_dimensions["A"].width = 10   # P&L Row
+        ws.column_dimensions["B"].width = 25   # Category
+        ws.column_dimensions["C"].width = 14   # Gross Amount
+        ws.column_dimensions["D"].width = 14   # Deductible Amount
+        ws.column_dimensions["E"].width = 25   # Source
+        ws.column_dimensions["F"].width = 60   # Calculation Steps
+        ws.column_dimensions["G"].width = 20   # Validation
+
+        # Title
+        ws["A1"] = "Calculation Logic - Audit Trail"
+        ws["A1"].font = Font(bold=True, size=14)
+        ws["A2"] = f"Property: {tax_return.property_address}"
+        ws["A3"] = f"Tax Year: {tax_return.tax_year}"
+
+        # Headers
+        headers = ["P&L Row", "Category", "Gross Amount", "Deductible", "Source", "Calculation Steps", "Validation"]
+        header_row = 5
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=header_row, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center")
+
+        # Start data rows
+        row = header_row + 1
+
+        # INCOME SECTION
+        ws.cell(row=row, column=1, value="INCOME")
+        ws.cell(row=row, column=1).font = Font(bold=True, size=11)
+        ws.cell(row=row, column=1).fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
+        row += 1
+
+        # Income items
+        income_fields = [
+            ("rental_income", "Rental Income"),
+            ("water_rates_recovered", "Water Rates Recovered"),
+            ("bank_contribution", "Bank Contribution"),
+            ("insurance_payout", "Insurance Payout"),
+            ("other_income", "Other Income"),
+        ]
+
+        for field_name, display_name in income_fields:
+            item = getattr(workings.income, field_name, None)
+            if item and item.gross_amount and item.gross_amount != 0:
+                self._write_logic_row(ws, row, item, display_name)
+                row += 1
+
+        row += 1  # Spacing
+
+        # EXPENSES SECTION
+        ws.cell(row=row, column=1, value="EXPENSES")
+        ws.cell(row=row, column=1).font = Font(bold=True, size=11)
+        ws.cell(row=row, column=1).fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
+        row += 1
+
+        # Expense items
+        expense_fields = [
+            ("interest", "Interest Expense"),
+            ("rates", "Council Rates"),
+            ("water_rates", "Water Rates"),
+            ("body_corporate", "Body Corporate"),
+            ("resident_society", "Resident Society"),
+            ("insurance", "Insurance"),
+            ("agent_fees", "Agent/PM Fees"),
+            ("repairs_maintenance", "Repairs & Maintenance"),
+            ("legal_fees", "Legal Fees"),
+            ("bank_fees", "Bank Fees"),
+            ("advertising", "Advertising"),
+            ("depreciation", "Depreciation"),
+            ("accounting_fees", "Accounting Fees"),
+            ("due_diligence", "Due Diligence"),
+            ("other_expenses", "Other Expenses"),
+        ]
+
+        for field_name, display_name in expense_fields:
+            item = getattr(workings.expenses, field_name, None)
+            if item and item.gross_amount and item.gross_amount != 0:
+                self._write_logic_row(ws, row, item, display_name)
+                row += 1
+
+        row += 1  # Spacing
+
+        # EXCLUDED ITEMS SECTION (if any)
+        excluded_items = []
+        if workings.income.bond_received and workings.income.bond_received.gross_amount:
+            excluded_items.append(("Bond Received", workings.income.bond_received))
+        if workings.expenses.principal_repayment and workings.expenses.principal_repayment.gross_amount:
+            excluded_items.append(("Principal Repayment", workings.expenses.principal_repayment))
+        if workings.expenses.capital_expenses and workings.expenses.capital_expenses.gross_amount:
+            excluded_items.append(("Capital Expenses", workings.expenses.capital_expenses))
+
+        if excluded_items:
+            ws.cell(row=row, column=1, value="EXCLUDED (Non-Deductible)")
+            ws.cell(row=row, column=1).font = Font(bold=True, size=11)
+            ws.cell(row=row, column=1).fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=7)
+            row += 1
+
+            for display_name, item in excluded_items:
+                self._write_logic_row(ws, row, item, display_name, is_excluded=True)
+                row += 1
+
+        logger.info(f"Built Calculation Logic sheet with {row - header_row - 1} line items")
+
+    def _write_logic_row(self, ws: Worksheet, row: int, item: LineItem, display_name: str, is_excluded: bool = False):
+        """Write a single row for a line item in the calculation logic sheet."""
+        # Column A: P&L Row
+        if item.pl_row:
+            ws.cell(row=row, column=1, value=item.pl_row)
+            ws.cell(row=row, column=1).alignment = Alignment(horizontal="center")
+
+        # Column B: Category
+        ws.cell(row=row, column=2, value=display_name)
+
+        # Column C: Gross Amount
+        gross = float(item.gross_amount) if item.gross_amount else 0
+        ws.cell(row=row, column=3, value=gross)
+        ws.cell(row=row, column=3).number_format = CURRENCY_FORMAT
+
+        # Column D: Deductible Amount (show if different from gross)
+        deductible = float(item.deductible_amount) if item.deductible_amount else gross
+        if is_excluded:
+            ws.cell(row=row, column=4, value=0)
+            ws.cell(row=row, column=4).number_format = CURRENCY_FORMAT
+        elif deductible != gross:
+            ws.cell(row=row, column=4, value=deductible)
+            ws.cell(row=row, column=4).number_format = CURRENCY_FORMAT
+        else:
+            ws.cell(row=row, column=4, value=deductible)
+            ws.cell(row=row, column=4).number_format = CURRENCY_FORMAT
+
+        # Column E: Source
+        source = item.source or item.source_code or ""
+        if item.calculation_logic and item.calculation_logic.primary_source_name:
+            source = item.calculation_logic.primary_source_name
+        ws.cell(row=row, column=5, value=source)
+
+        # Column F: Calculation Steps
+        steps_text = ""
+        if item.calculation_logic:
+            calc = item.calculation_logic
+            parts = []
+
+            # Add calculation method if available
+            if calc.calculation_method:
+                parts.append(f"Method: {calc.calculation_method}")
+
+            # Add calculation steps
+            if calc.calculation_steps:
+                # Join steps, limit to first 5 for readability
+                step_text = "; ".join(calc.calculation_steps[:5])
+                if len(calc.calculation_steps) > 5:
+                    step_text += f" ... (+{len(calc.calculation_steps) - 5} more)"
+                parts.append(step_text)
+
+            # Add formula if available
+            if calc.formula:
+                parts.append(f"Formula: {calc.formula}")
+
+            # Add adjustments if any
+            if calc.adjustments:
+                adj_text = "; ".join([f"{a.get('description', 'Adj')}: {a.get('amount', 0)}" for a in calc.adjustments[:3]])
+                parts.append(f"Adjustments: {adj_text}")
+
+            steps_text = "\n".join(parts)
+        elif item.notes:
+            steps_text = item.notes
+
+        ws.cell(row=row, column=6, value=steps_text)
+        ws.cell(row=row, column=6).alignment = Alignment(wrap_text=True, vertical="top")
+
+        # Column G: Validation Status
+        validation_text = ""
+        if item.calculation_logic:
+            calc = item.calculation_logic
+            status = calc.validation_status or "not_validated"
+
+            # Status indicator
+            if status == "matched":
+                validation_text = "✓ Matched"
+            elif status == "variance":
+                validation_text = f"⚠ Variance: ${float(calc.variance_amount or 0):,.2f}"
+                if calc.variance_notes:
+                    validation_text += f"\n{calc.variance_notes}"
+            else:
+                validation_text = "? Not validated"
+
+            # Add cross-validation sources
+            if calc.cross_validated_with:
+                cross_val = ", ".join(calc.cross_validated_with[:3])
+                validation_text += f"\nvs: {cross_val}"
+        else:
+            # Fall back to verification status
+            if item.verification_status:
+                status_map = {
+                    "verified": "✓ Verified",
+                    "needs_review": "⚠ Needs Review",
+                    "unverified": "? Unverified",
+                    "missing_invoice": "! Missing Invoice",
+                    "estimated": "~ Estimated",
+                }
+                validation_text = status_map.get(item.verification_status.value, str(item.verification_status))
+
+        ws.cell(row=row, column=7, value=validation_text)
+        ws.cell(row=row, column=7).alignment = Alignment(wrap_text=True, vertical="top")
+
+        # Set row height for wrapped text
+        ws.row_dimensions[row].height = 45
 
     # =========================================================================
     # DATA LOADING METHODS

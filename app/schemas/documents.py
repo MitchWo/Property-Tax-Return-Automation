@@ -26,6 +26,7 @@ class DocumentType(str, Enum):
     CCC = "ccc"
     LANDLORD_INSURANCE = "landlord_insurance"
     RATES = "rates"
+    PERSONAL_EXPENDITURE_CLAIMS = "personal_expenditure_claims"
     OTHER = "other"
     INVALID = "invalid"
 
