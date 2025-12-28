@@ -220,6 +220,11 @@ class ExpenseWorkings(BaseModel):
     due_diligence: Optional[LineItem] = None  # Row 18 - LIM, meth test, etc.
     other_expenses: Optional[LineItem] = None
 
+    # Personal expenditure claims (Row 37 - self-managing landlord deductions)
+    home_office: Optional[LineItem] = None  # Business use % of home expenses
+    mobile_phone: Optional[LineItem] = None  # 50% of mobile expenses
+    mileage: Optional[LineItem] = None  # Business km × IRD rate
+
     # Excluded expenses (tracked but not deductible)
     principal_repayment: Optional[LineItem] = None
     capital_expenses: Optional[LineItem] = None
@@ -236,7 +241,8 @@ class ExpenseWorkings(BaseModel):
         deductible_fields = [
             "interest", "rates", "water_rates", "body_corporate", "resident_society",
             "insurance", "agent_fees", "repairs_maintenance", "legal_fees", "bank_fees",
-            "advertising", "depreciation", "accounting_fees", "due_diligence", "other_expenses"
+            "advertising", "depreciation", "accounting_fees", "due_diligence", "other_expenses",
+            "home_office", "mobile_phone", "mileage"  # Personal expenditure claims
         ]
 
         for field_name in deductible_fields:

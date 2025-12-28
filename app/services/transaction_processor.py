@@ -1442,6 +1442,69 @@ class TransactionProcessor:
 
             logger.info(f"Converted maintenance invoice to {len(transactions)} transactions")
 
+        elif document_type == "personal_expenditure_claims":
+            # Lighthouse Personal Expenditure Claims template
+            # Contains up to 3 claim types: home_office, mobile_phone, mileage
+            # Tax year from extracted data, or None (transactions will use tax return's year)
+            tax_year = key_details.get("tax_year")
+
+            # 1. Home Office Claim
+            home_office = key_details.get("home_office", {})
+            home_office_claim = home_office.get("claim_amount")
+            if home_office_claim:
+                amount = self._parse_amount(home_office_claim)
+                if amount and amount > 0:
+                    business_pct = home_office.get("business_use_percentage", 0)
+                    total_exp = home_office.get("total_expenses", 0)
+                    transactions.append({
+                        "date": tax_year,
+                        "description": f"Home Office ({business_pct:.1f}% of ${total_exp:,.2f})" if business_pct and total_exp else f"Home Office Claim ({filename})",
+                        "amount": -abs(amount),  # Expense
+                        "other_party": "Personal Expenditure Claims",
+                        "suggested_category": "home_office",
+                        "confidence": 0.98,
+                        "needs_review": False,
+                        "review_reasons": []
+                    })
+
+            # 2. Mobile Phone Claim
+            mobile_phone = key_details.get("mobile_phone", {})
+            mobile_claim = mobile_phone.get("claim_amount")
+            if mobile_claim:
+                amount = self._parse_amount(mobile_claim)
+                if amount and amount > 0:
+                    annual_exp = mobile_phone.get("annual_expense", 0)
+                    transactions.append({
+                        "date": tax_year,
+                        "description": f"Mobile Phone (50% of ${annual_exp:,.2f})" if annual_exp else f"Mobile Phone Claim ({filename})",
+                        "amount": -abs(amount),  # Expense
+                        "other_party": "Personal Expenditure Claims",
+                        "suggested_category": "mobile_phone",
+                        "confidence": 0.98,
+                        "needs_review": False,
+                        "review_reasons": []
+                    })
+
+            # 3. Mileage Claim
+            mileage = key_details.get("mileage", {})
+            mileage_claim = mileage.get("claim_amount")
+            if mileage_claim:
+                amount = self._parse_amount(mileage_claim)
+                if amount and amount > 0:
+                    kms = mileage.get("kilometres_travelled", 0)
+                    transactions.append({
+                        "date": tax_year,
+                        "description": f"Mileage ({kms:,.0f} km x $0.99)" if kms else f"Mileage Claim ({filename})",
+                        "amount": -abs(amount),  # Expense
+                        "other_party": "Personal Expenditure Claims",
+                        "suggested_category": "mileage",
+                        "confidence": 0.98,
+                        "needs_review": False,
+                        "review_reasons": []
+                    })
+
+            logger.info(f"Converted personal expenditure claims to {len(transactions)} transactions")
+
         return transactions
 
     def _parse_amount(self, value: Any) -> Optional[float]:

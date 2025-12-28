@@ -1180,7 +1180,43 @@ CRITICAL: Every line item MUST include "calculation_logic" explaining HOW the am
         }}
       ]
     }},
-    "other_expenses": null
+    "other_expenses": null,
+    "home_office": {{
+      "pl_row": 37,
+      "amount": 0.00,
+      "source_code": "CP",
+      "source": "Personal Expenditure Claims",
+      "notes": "Home office deduction (business use % of home expenses)",
+      "calculation_logic": {{
+        "primary_source_code": "CP",
+        "primary_source_name": "Personal Expenditure Claims",
+        "calculation_method": "Business use % × Total home expenses"
+      }}
+    }},
+    "mobile_phone": {{
+      "pl_row": 37,
+      "amount": 0.00,
+      "source_code": "CP",
+      "source": "Personal Expenditure Claims",
+      "notes": "50% of mobile phone expenses",
+      "calculation_logic": {{
+        "primary_source_code": "CP",
+        "primary_source_name": "Personal Expenditure Claims",
+        "calculation_method": "50% of annual mobile expense"
+      }}
+    }},
+    "mileage": {{
+      "pl_row": 37,
+      "amount": 0.00,
+      "source_code": "CP",
+      "source": "Personal Expenditure Claims",
+      "notes": "Business km × IRD rate ($0.99/km)",
+      "calculation_logic": {{
+        "primary_source_code": "CP",
+        "primary_source_name": "Personal Expenditure Claims",
+        "calculation_method": "Business kilometres × $0.99 IRD rate"
+      }}
+    }}
   }},
   "excluded": {{
     "principal_repayment": {{
@@ -1549,7 +1585,8 @@ Return ONLY the JSON object, no other text.
             "rates",
             "insurance",
             "landlord_insurance",
-            "settlement_statement"
+            "settlement_statement",
+            "personal_expenditure_claims",  # Home office, mobile, mileage claims
         ]
 
         # First process ordered types
@@ -2466,6 +2503,63 @@ Return ONLY the JSON object, no other text.
                 notes=oe_data.get("notes"),
                 calculation_logic=self._parse_calculation_logic(oe_data.get("calculation_logic"))
             )
+
+        # Home Office (Personal Expenditure Claims - Row 37)
+        if expenses_data.get("home_office"):
+            ho_data = expenses_data["home_office"]
+            amount = _safe_decimal(_safe_abs(ho_data.get("amount")))
+            if amount > 0:
+                workings.expenses.home_office = LineItem(
+                    category_code="home_office",
+                    display_name="Home Office",
+                    pl_row=ho_data.get("pl_row", 37),
+                    gross_amount=amount,
+                    deductible_percentage=100.0,
+                    deductible_amount=amount,
+                    source=ho_data.get("source", "Personal Expenditure Claims"),
+                    source_code=ho_data.get("source_code", "CP"),
+                    verification_status=self._map_verification_status(ho_data.get("verification", "verified")),
+                    notes=ho_data.get("notes"),
+                    calculation_logic=self._parse_calculation_logic(ho_data.get("calculation_logic"))
+                )
+
+        # Mobile Phone (Personal Expenditure Claims - Row 37)
+        if expenses_data.get("mobile_phone"):
+            mp_data = expenses_data["mobile_phone"]
+            amount = _safe_decimal(_safe_abs(mp_data.get("amount")))
+            if amount > 0:
+                workings.expenses.mobile_phone = LineItem(
+                    category_code="mobile_phone",
+                    display_name="Mobile Phone",
+                    pl_row=mp_data.get("pl_row", 37),
+                    gross_amount=amount,
+                    deductible_percentage=100.0,
+                    deductible_amount=amount,
+                    source=mp_data.get("source", "Personal Expenditure Claims"),
+                    source_code=mp_data.get("source_code", "CP"),
+                    verification_status=self._map_verification_status(mp_data.get("verification", "verified")),
+                    notes=mp_data.get("notes"),
+                    calculation_logic=self._parse_calculation_logic(mp_data.get("calculation_logic"))
+                )
+
+        # Mileage (Personal Expenditure Claims - Row 37)
+        if expenses_data.get("mileage"):
+            ml_data = expenses_data["mileage"]
+            amount = _safe_decimal(_safe_abs(ml_data.get("amount")))
+            if amount > 0:
+                workings.expenses.mileage = LineItem(
+                    category_code="mileage",
+                    display_name="Mileage",
+                    pl_row=ml_data.get("pl_row", 37),
+                    gross_amount=amount,
+                    deductible_percentage=100.0,
+                    deductible_amount=amount,
+                    source=ml_data.get("source", "Personal Expenditure Claims"),
+                    source_code=ml_data.get("source_code", "CP"),
+                    verification_status=self._map_verification_status(ml_data.get("verification", "verified")),
+                    notes=ml_data.get("notes"),
+                    calculation_logic=self._parse_calculation_logic(ml_data.get("calculation_logic"))
+                )
 
         # Repairs
         if expenses_data.get("repairs_maintenance"):

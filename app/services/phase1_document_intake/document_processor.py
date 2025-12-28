@@ -65,6 +65,7 @@ FINANCIAL_DOCUMENT_TYPES = {
     "resident_society",
     # Client-prepared summaries (rental workbooks, expense trackers)
     "personal_expense_claims",
+    "personal_expenditure_claims",  # Lighthouse template for home office, mobile, mileage
     "rental_expense_summary",
     "rental_summary",  # Owner-prepared rental property income/expense summary
 }
