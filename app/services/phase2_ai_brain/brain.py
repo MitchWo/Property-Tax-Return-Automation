@@ -565,27 +565,19 @@ If you cannot determine a new value, respond with:
             db=db
         )
 
-        # Get RAG learnings (if available) - expanded for better accuracy
+        # Get RAG learnings (if available) - search across all relevant namespaces
+        # This queries 6 namespaces: skill_learnings, transaction-coding, tax-rules,
+        # gst-rules, pnl-mapping, common-errors
         rag_learnings = []
         try:
             if knowledge_store:
-                # Query for relevant transaction patterns
-                transaction_learnings = await knowledge_store.search(
-                    query=f"rental property tax transactions categorization {tax_return.property_address}",
-                    namespace="transaction-coding",
-                    top_k=20
+                # Use comprehensive search across all categorization-relevant namespaces
+                rag_learnings = await knowledge_store.search_for_categorization(
+                    description=f"rental property tax workings calculations {tax_return.property_address}",
+                    other_party=None,
+                    top_k=30
                 )
-                rag_learnings.extend(transaction_learnings)
-
-                # Also query for skill learnings (domain knowledge)
-                skill_learnings = await knowledge_store.search(
-                    query="rental property deductions interest rates insurance repairs",
-                    namespace="skill_learnings",
-                    top_k=10
-                )
-                rag_learnings.extend(skill_learnings)
-
-                logger.info(f"Loaded {len(rag_learnings)} RAG learnings for context")
+                logger.info(f"Loaded {len(rag_learnings)} RAG learnings from 6 namespaces")
         except Exception as e:
             logger.warning(f"Could not load RAG learnings: {e}")
 
