@@ -63,3 +63,4 @@ logs/
 # Database
 *.db
 *.sqlite3
+.playwright-mcp/
