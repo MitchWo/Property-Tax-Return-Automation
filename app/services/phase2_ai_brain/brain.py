@@ -624,6 +624,7 @@ If you cannot determine a new value, respond with:
                 "gst_registered": tax_return.gst_registered,
                 "client_id": str(tax_return.client_id)
             },
+            "review_result": tax_return.review_result or {},  # Phase 1 analysis including property_type_suggestion
             "documents": documents,
             "documents_by_type": documents_by_type,
             "inventory": inventory_data,
@@ -644,9 +645,19 @@ If you cannot determine a new value, respond with:
         # Default based on property type and tax year (conservative approach)
         # - New builds (CCC after 27 March 2020): 100% deductible
         # - Existing properties: 80% (FY25), 100% (FY26+)
-        # - Unknown/NOT_SURE: Use conservative 80% for FY25
+        # - Unknown/NOT_SURE: Use Phase 1 AI suggestion
         property_type = tax_return.get("property_type", "").lower()
         tax_year = tax_return.get("tax_year", "FY25")
+
+        # If user selected "not_sure", use Phase 1's AI suggestion based on CCC analysis
+        if property_type == "not_sure":
+            review_result = context.get("review_result", {})
+            if review_result:
+                property_type_suggestion = review_result.get("property_type_suggestion", {})
+                suggested_type = property_type_suggestion.get("suggested_type")
+                if suggested_type in ("new_build", "existing"):
+                    logger.info(f"Using Phase 1 AI suggestion for property type: {suggested_type}")
+                    property_type = suggested_type
 
         # Determine default based on property type and year
         if property_type == "new_build":
@@ -1529,6 +1540,8 @@ Return ONLY the JSON object, no other text.
                         )
 
                         # Update categorization suggestion
+                        if "categorization" not in txn:
+                            txn["categorization"] = {}
                         txn["categorization"]["suggested_category"] = "bank_contribution"
                         txn["categorization"]["confidence"] = 0.6
                         txn["categorization"]["is_deductible"] = False
