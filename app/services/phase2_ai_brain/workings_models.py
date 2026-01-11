@@ -223,7 +223,7 @@ class ExpenseWorkings(BaseModel):
     # Personal expenditure claims (Row 37 - self-managing landlord deductions)
     home_office: Optional[LineItem] = None  # Business use % of home expenses
     mobile_phone: Optional[LineItem] = None  # 50% of mobile expenses
-    mileage: Optional[LineItem] = None  # Business km × IRD rate
+    mileage: Optional[LineItem] = None  # Travel/mileage - from personal_expenditure_claims OR rental_summary
 
     # Excluded expenses (tracked but not deductible)
     principal_repayment: Optional[LineItem] = None

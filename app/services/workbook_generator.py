@@ -548,10 +548,7 @@ class WorkbookGenerator:
         ws["C22"] = 0
         ws["C22"].number_format = CURRENCY_FORMAT
         write_expense_line(23, "General Expenses", workings.expenses.other_expenses)
-        ws["A24"] = "Home Office Expense"
-        ws["A24"].font = Font(bold=True)
-        ws["C24"] = 0
-        ws["C24"].number_format = CURRENCY_FORMAT
+        write_expense_line(24, "Home Office Expense", workings.expenses.home_office)
         write_expense_line(25, "Insurance", workings.expenses.insurance)
 
         # Interest - show deductible amount with percentage
@@ -566,10 +563,7 @@ class WorkbookGenerator:
         ws["A29"].font = Font(bold=True)
         ws["C29"] = 0
         ws["C29"].number_format = CURRENCY_FORMAT
-        ws["A30"] = "Motor Vehicle Expenses"
-        ws["A30"].font = Font(bold=True)
-        ws["C30"] = 0
-        ws["C30"].number_format = CURRENCY_FORMAT
+        write_expense_line(30, "Motor Vehicle / Mileage", workings.expenses.mileage)
         ws["A31"] = "Office Expenses"
         ws["A31"].font = Font(bold=True)
         ws["C31"] = 0
@@ -592,10 +586,7 @@ class WorkbookGenerator:
         ws["A37"].font = Font(bold=True)
         ws["C37"] = 0
         ws["C37"].number_format = CURRENCY_FORMAT
-        ws["A38"] = "Telephone & Internet"
-        ws["A38"].font = Font(bold=True)
-        ws["C38"] = 0
-        ws["C38"].number_format = CURRENCY_FORMAT
+        write_expense_line(38, "Telephone & Mobile", workings.expenses.mobile_phone)
         ws["A39"] = "Travel - National"
         ws["A39"].font = Font(bold=True)
         ws["C39"] = 0
@@ -2130,6 +2121,9 @@ class WorkbookGenerator:
             ("depreciation", "Depreciation"),
             ("accounting_fees", "Accounting Fees"),
             ("due_diligence", "Due Diligence"),
+            ("home_office", "Home Office"),
+            ("mobile_phone", "Mobile Phone"),
+            ("mileage", "Mileage/Travel"),
             ("other_expenses", "Other Expenses"),
         ]
 
@@ -2206,21 +2200,18 @@ class WorkbookGenerator:
             if calc.calculation_method:
                 parts.append(f"Method: {calc.calculation_method}")
 
-            # Add calculation steps
+            # Add calculation steps - show ALL for complete audit trail
             if calc.calculation_steps:
-                # Join steps, limit to first 5 for readability
-                step_text = "; ".join(calc.calculation_steps[:5])
-                if len(calc.calculation_steps) > 5:
-                    step_text += f" ... (+{len(calc.calculation_steps) - 5} more)"
+                step_text = "; ".join(calc.calculation_steps)
                 parts.append(step_text)
 
             # Add formula if available
             if calc.formula:
                 parts.append(f"Formula: {calc.formula}")
 
-            # Add adjustments if any
+            # Add adjustments if any - show ALL for complete audit trail
             if calc.adjustments:
-                adj_text = "; ".join([f"{a.get('description', 'Adj')}: {a.get('amount', 0)}" for a in calc.adjustments[:3]])
+                adj_text = "; ".join([f"{a.get('description', 'Adj')}: {a.get('amount', 0)}" for a in calc.adjustments])
                 parts.append(f"Adjustments: {adj_text}")
 
             steps_text = "\n".join(parts)

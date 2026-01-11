@@ -17,9 +17,28 @@ router = APIRouter(prefix="/api/categorization", tags=["categorization"])
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
+from zoneinfo import ZoneInfo
 
 web_router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+
+# Custom Jinja2 filter for NZ timezone datetime formatting
+def format_nz_datetime(value, fmt='%d %b %Y %H:%M'):
+    """Format a datetime in NZ timezone."""
+    if value is None:
+        return ""
+    try:
+        nz_tz = ZoneInfo("Pacific/Auckland")
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=ZoneInfo("UTC"))
+        nz_time = value.astimezone(nz_tz)
+        return nz_time.strftime(fmt)
+    except Exception:
+        return value.strftime(fmt) if hasattr(value, 'strftime') else str(value)
+
+
+templates.env.filters["nz_datetime"] = format_nz_datetime
 
 
 @router.get("/{tax_return_id}/analytics")

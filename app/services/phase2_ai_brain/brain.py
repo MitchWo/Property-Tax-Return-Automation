@@ -1024,6 +1024,19 @@ Do NOT divide by 1.15 for non-registered taxpayers.
 18. ❌ Inconsistent flat rate credit treatment across months → ✓ Apply same treatment to ALL months
 19. ❌ Treating NEW heater/fan installation as Repairs → ✓ NEW installations = CAPITAL (per IRD QB 20/01)
 20. ❌ Claiming all Healthy Homes costs as deductible → ✓ Only assessments and repairs to EXISTING items are deductible
+21. ❌ Missing travel/mileage from rental_summary → ✓ Self-managed properties often have travel expenses in their workbook - include as mileage (Row 37)
+
+### SELF-MANAGED PROPERTIES (rental_summary documents)
+For self-managed properties (no PM statement), the client may provide a rental_summary workbook/spreadsheet.
+These often contain:
+- Rental income (weekly/fortnightly rent receipts)
+- Expense breakdowns (rates, insurance, repairs)
+- **Travel/mileage for property inspections** → Include in mileage expense (Row 37)
+- Depreciation schedules
+- Interest calculations
+
+**CRITICAL**: Check rental_summary documents for travel/mileage expenses. These are DEDUCTIBLE and go to Row 37.
+Example: "Travel: 368km × $0.95 = $349.60" → mileage expense
 
 ### BACHCARE / HOLIDAY RENTAL FLAT RATE CREDITS (IMPORTANT)
 When processing Bachcare or other short-term/holiday rental PM statements:
@@ -1212,12 +1225,12 @@ CRITICAL: Every line item MUST include "calculation_logic" explaining HOW the am
       "pl_row": 37,
       "amount": 0.00,
       "source_code": "CP",
-      "source": "Personal Expenditure Claims",
-      "notes": "Business km × IRD rate ($0.99/km)",
+      "source": "Personal Expenditure Claims OR Rental Summary",
+      "notes": "Business km × IRD rate - check BOTH personal_expenditure_claims AND rental_summary for travel/mileage",
       "calculation_logic": {{
         "primary_source_code": "CP",
-        "primary_source_name": "Personal Expenditure Claims",
-        "calculation_method": "Business kilometres × $0.99 IRD rate"
+        "primary_source_name": "Personal Expenditure Claims or Rental Summary",
+        "calculation_method": "Business kilometres × rate (IRD $0.99/km or client rate if specified)"
       }}
     }}
   }},
@@ -1585,6 +1598,7 @@ Return ONLY the JSON object, no other text.
         # Process in accountant workflow order
         order = [
             "property_manager_statement",
+            "rental_summary",  # Self-managed property workbooks (income, expenses, travel, depreciation)
             "bank_statement",
             "loan_statement",
             "rates",
@@ -1891,6 +1905,81 @@ Return ONLY the JSON object, no other text.
                         lines.append(f"  - Opening Balance: ${summary['opening_balance']:.2f}")
                     if summary.get("closing_balance") is not None:
                         lines.append(f"  - Closing Balance: ${summary['closing_balance']:.2f}")
+
+        # Special handling for rental_summary (self-managed property workbooks)
+        if doc_type == "rental_summary":
+            tool_use = extracted.get("tool_use_extraction", {})
+            if not tool_use:
+                # Also check key_details for tool_use_extraction
+                key_details = extracted.get("key_details", {})
+                if isinstance(key_details, dict):
+                    tool_use = key_details.get("tool_use_extraction", {})
+
+            if tool_use:
+                # INCOME
+                income = tool_use.get("income", {})
+                if income:
+                    lines.append("\n**📥 RENTAL SUMMARY INCOME:**")
+                    if income.get("gross_rent"):
+                        lines.append(f"  - Gross Rent: ${income['gross_rent']:.2f}")
+                    if income.get("total_income"):
+                        lines.append(f"  **TOTAL INCOME: ${income['total_income']:.2f}**")
+
+                # EXPENSES - with special emphasis on travel
+                expenses = tool_use.get("expenses", {})
+                if expenses:
+                    lines.append("\n**📤 RENTAL SUMMARY EXPENSES:**")
+
+                    # Rates
+                    rates = expenses.get("rates", {})
+                    if rates and isinstance(rates, dict):
+                        if rates.get("total_rates"):
+                            lines.append(f"  - Rates Total: ${rates['total_rates']:.2f}")
+
+                    # Interest
+                    interest = expenses.get("interest", {})
+                    if interest and isinstance(interest, dict):
+                        if interest.get("gross_interest"):
+                            lines.append(f"  - Interest Gross: ${interest['gross_interest']:.2f}")
+                        if interest.get("deductible_amount"):
+                            lines.append(f"  - Interest Deductible ({interest.get('deductible_percentage', 80)}%): ${interest['deductible_amount']:.2f}")
+
+                    # Insurance
+                    insurance = expenses.get("insurance", {})
+                    if insurance and isinstance(insurance, dict):
+                        if insurance.get("total_insurance"):
+                            lines.append(f"  - Insurance: ${insurance['total_insurance']:.2f}")
+
+                    # TRAVEL - CRITICAL for mileage
+                    travel = expenses.get("travel", {})
+                    if travel and isinstance(travel, dict):
+                        km = travel.get("kilometres", 0)
+                        rate = travel.get("rate_per_km", 0)
+                        total = travel.get("total_travel", 0)
+                        if total:
+                            lines.append(f"  - **🚗 TRAVEL/MILEAGE: {km} km × ${rate}/km = ${total:.2f}** → ROW 37")
+
+                    # Repairs
+                    if expenses.get("repairs_total"):
+                        lines.append(f"  - Repairs: ${expenses['repairs_total']:.2f}")
+
+                    # Depreciation
+                    depreciation = expenses.get("depreciation", {})
+                    if depreciation and isinstance(depreciation, dict):
+                        if depreciation.get("total_depreciation"):
+                            lines.append(f"  - Depreciation: ${depreciation['total_depreciation']:.2f}")
+
+                    if expenses.get("total_expenses"):
+                        lines.append(f"  **TOTAL EXPENSES: ${expenses['total_expenses']:.2f}**")
+
+                # SUMMARY
+                summary = tool_use.get("summary", {})
+                if summary:
+                    lines.append("\n**📊 RENTAL SUMMARY TOTALS:**")
+                    if summary.get("net_rental_income"):
+                        lines.append(f"  - Net Rental Income: ${summary['net_rental_income']:.2f}")
+                    if summary.get("ownership_share_amount"):
+                        lines.append(f"  - Owner's Share (if joint): ${summary['ownership_share_amount']:.2f}")
 
         return "\n".join(lines)
 
@@ -2547,19 +2636,19 @@ Return ONLY the JSON object, no other text.
                     calculation_logic=self._parse_calculation_logic(mp_data.get("calculation_logic"))
                 )
 
-        # Mileage (Personal Expenditure Claims - Row 37)
+        # Mileage/Travel (Personal Expenditure Claims OR Rental Summary - Row 37)
         if expenses_data.get("mileage"):
             ml_data = expenses_data["mileage"]
             amount = _safe_decimal(_safe_abs(ml_data.get("amount")))
             if amount > 0:
                 workings.expenses.mileage = LineItem(
                     category_code="mileage",
-                    display_name="Mileage",
+                    display_name="Mileage/Travel",
                     pl_row=ml_data.get("pl_row", 37),
                     gross_amount=amount,
                     deductible_percentage=100.0,
                     deductible_amount=amount,
-                    source=ml_data.get("source", "Personal Expenditure Claims"),
+                    source=ml_data.get("source", "Client Provided"),
                     source_code=ml_data.get("source_code", "CP"),
                     verification_status=self._map_verification_status(ml_data.get("verification", "verified")),
                     notes=ml_data.get("notes"),
@@ -2834,8 +2923,8 @@ Return ONLY the JSON object, no other text.
             expense_fields = [
                 "advertising", "agent_fees", "bank_fees", "body_corporate",
                 "accounting_fees", "depreciation", "due_diligence", "insurance",
-                "interest", "legal_fees", "rates", "repairs", "resident_society",
-                "travel", "water_rates", "other_expenses"
+                "interest", "legal_fees", "rates", "repairs_maintenance", "resident_society",
+                "mileage", "water_rates", "other_expenses", "home_office", "mobile_phone"
             ]
             for field_name in expense_fields:
                 item = getattr(workings.expenses, field_name, None)

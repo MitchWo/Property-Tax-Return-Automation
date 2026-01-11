@@ -56,7 +56,32 @@ def format_currency(value):
         return "$0.00"
 
 
+# Custom Jinja2 filter for NZ timezone datetime formatting
+def format_nz_datetime(value, fmt='%d %b %Y %H:%M'):
+    """Format a datetime in NZ timezone."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    if value is None:
+        return ""
+
+    try:
+        nz_tz = ZoneInfo("Pacific/Auckland")
+
+        # If datetime is naive, assume it's UTC
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=ZoneInfo("UTC"))
+
+        # Convert to NZ timezone
+        nz_time = value.astimezone(nz_tz)
+        return nz_time.strftime(fmt)
+    except Exception:
+        # Fallback to simple formatting if timezone conversion fails
+        return value.strftime(fmt) if hasattr(value, 'strftime') else str(value)
+
+
 templates.env.filters["currency"] = format_currency
+templates.env.filters["nz_datetime"] = format_nz_datetime
 
 # Initialize document processor
 document_processor = DocumentProcessor()
@@ -167,6 +192,106 @@ async def list_tax_returns(skip: int = 0, limit: int = 100, db: AsyncSession = D
         )
         for tr in tax_returns
     ]
+
+
+@api_router.delete("/returns/{tax_return_id}")
+async def delete_tax_return(tax_return_id: UUID, db: AsyncSession = Depends(get_db)):
+    """
+    Delete a tax return and all related data.
+
+    This will delete:
+    - All documents (and their physical files)
+    - All transactions
+    - All workings, flags, document requests, client questions
+    - Transaction summaries
+    - Document inventory records
+    - The tax return itself
+    """
+    import shutil
+    import os
+    from app.models.db_models import (
+        TaxReturnWorkings, TransactionSummary, DocumentInventoryRecord,
+        DocumentRequest, ClientQuestion, WorkingsFlag
+    )
+
+    # Check if tax return exists
+    result = await db.execute(
+        select(TaxReturn)
+        .options(selectinload(TaxReturn.documents))
+        .where(TaxReturn.id == tax_return_id)
+    )
+    tax_return = result.scalar_one_or_none()
+
+    if not tax_return:
+        raise HTTPException(status_code=404, detail="Tax return not found")
+
+    try:
+        # Get the upload directory for this tax return to delete physical files
+        upload_dirs = set()
+        for doc in tax_return.documents:
+            if doc.file_path:
+                dir_path = os.path.dirname(doc.file_path)
+                if os.path.exists(dir_path):
+                    upload_dirs.add(dir_path)
+
+        # Delete workings and related records (flags, requests, questions cascade from workings)
+        await db.execute(
+            select(TaxReturnWorkings).where(TaxReturnWorkings.tax_return_id == tax_return_id)
+        )
+        workings_result = await db.execute(
+            select(TaxReturnWorkings).where(TaxReturnWorkings.tax_return_id == tax_return_id)
+        )
+        workings_list = workings_result.scalars().all()
+        for workings in workings_list:
+            await db.delete(workings)
+
+        # Delete transaction summaries
+        summary_result = await db.execute(
+            select(TransactionSummary).where(TransactionSummary.tax_return_id == tax_return_id)
+        )
+        for summary in summary_result.scalars().all():
+            await db.delete(summary)
+
+        # Delete document inventory records
+        inventory_result = await db.execute(
+            select(DocumentInventoryRecord).where(DocumentInventoryRecord.tax_return_id == tax_return_id)
+        )
+        for inventory in inventory_result.scalars().all():
+            await db.delete(inventory)
+
+        # Delete orphaned document requests and client questions (if any not linked to workings)
+        doc_req_result = await db.execute(
+            select(DocumentRequest).where(DocumentRequest.tax_return_id == tax_return_id)
+        )
+        for doc_req in doc_req_result.scalars().all():
+            await db.delete(doc_req)
+
+        client_q_result = await db.execute(
+            select(ClientQuestion).where(ClientQuestion.tax_return_id == tax_return_id)
+        )
+        for client_q in client_q_result.scalars().all():
+            await db.delete(client_q)
+
+        # Delete the tax return (cascades to documents and transactions)
+        await db.delete(tax_return)
+        await db.commit()
+
+        # Delete physical upload directories
+        for dir_path in upload_dirs:
+            try:
+                if os.path.exists(dir_path):
+                    shutil.rmtree(dir_path)
+                    logger.info(f"Deleted upload directory: {dir_path}")
+            except Exception as e:
+                logger.warning(f"Failed to delete directory {dir_path}: {e}")
+
+        logger.info(f"Successfully deleted tax return {tax_return_id}")
+        return {"message": "Tax return deleted successfully", "id": str(tax_return_id)}
+
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error deleting tax return {tax_return_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete tax return: {str(e)}")
 
 
 @api_router.get("/returns/{tax_return_id}/documents", response_model=List[DocumentResponse])
