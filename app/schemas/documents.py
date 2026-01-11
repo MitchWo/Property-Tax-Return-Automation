@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.db_models import DocumentStatus, PropertyType, TaxReturnStatus, local_now
 
@@ -181,8 +181,7 @@ class TaxReturnResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DocumentResponse(BaseModel):
@@ -197,5 +196,4 @@ class DocumentResponse(BaseModel):
     status: DocumentStatus
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

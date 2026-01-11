@@ -1,7 +1,7 @@
 """Transaction categorizer service with multi-layer categorization and learning."""
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -532,7 +532,7 @@ class TransactionCategorizer:
         if pattern:
             # Update usage stats
             pattern.times_applied += 1
-            pattern.last_used_at = datetime.utcnow()
+            pattern.last_used_at = datetime.now(timezone.utc)
             await db.commit()
 
             return {
@@ -767,7 +767,7 @@ IMPORTANT:
         try:
             # Log API call
             logger.info(f"Sending batch of {len(transactions)} transactions to Claude API")
-            start_time = datetime.utcnow()
+            start_time = datetime.now(timezone.utc)
 
             response = await self.claude_client.client.messages.create(
                 model=self.claude_client.model,
@@ -777,7 +777,7 @@ IMPORTANT:
             )
 
             # Log response time
-            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
             logger.info(f"Claude API response received in {elapsed:.2f} seconds")
 
             response_text = response.content[0].text
@@ -941,7 +941,7 @@ IMPORTANT:
         transaction.category_code = corrected_category
         transaction.manually_reviewed = True
         transaction.reviewed_by = corrected_by
-        transaction.reviewed_at = datetime.utcnow()
+        transaction.reviewed_at = datetime.now(timezone.utc)
         transaction.needs_review = False
 
         pattern_id = None

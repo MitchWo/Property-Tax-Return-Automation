@@ -161,7 +161,7 @@ class PatternMatcher:
     def match_pattern(
         self,
         description: str,
-        transaction_type: str = None
+        transaction_type: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Match description against regex patterns.
@@ -208,7 +208,7 @@ class PatternMatcher:
     def match_keyword(
         self,
         description: str,
-        transaction_type: str = None
+        transaction_type: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Match description against keyword rules (lowest priority).
@@ -257,9 +257,9 @@ class PatternMatcher:
     def match(
         self,
         description: str,
-        other_party: str = None,
-        amount: float = None,
-        transaction_type: str = None
+        other_party: Optional[str] = None,
+        amount: Optional[float] = None,
+        transaction_type: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Full matching pipeline: payee -> pattern -> keyword.
@@ -294,7 +294,7 @@ class PatternMatcher:
     def _apply_amount_rules(
         self,
         match: Dict[str, Any],
-        amount: float = None
+        amount: Optional[float] = None
     ) -> Dict[str, Any]:
         """Apply amount-based rules to flag unusual transactions."""
         if amount is None:

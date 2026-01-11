@@ -15,7 +15,7 @@ Note: Phase 2 combines the original Phase 2 (Knowledge & Learning) and Phase 3
 import logging
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
@@ -225,7 +225,7 @@ class TransactionProcessor:
 
             # Update document status
             document.processing_status = 'completed'
-            document.processed_at = datetime.utcnow()
+            document.processed_at = datetime.now(timezone.utc)
             await db.commit()
 
             logger.info(f"Successfully processed {len(processed_transactions)} transactions")
@@ -881,7 +881,7 @@ class TransactionProcessor:
                     txn_date = None
                     if txn.get("date"):
                         try:
-                            from datetime import datetime as dt
+                            from datetime import datetime, timezone as dt
                             txn_date = dt.strptime(txn["date"], "%Y-%m-%d").date()
                         except ValueError:
                             # Try alternative formats
@@ -1530,7 +1530,7 @@ class TransactionProcessor:
 
     def _parse_date(self, value: Any) -> Optional[str]:
         """Parse a date from various formats and return ISO format (YYYY-MM-DD)."""
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         if value is None:
             return None
@@ -1584,7 +1584,7 @@ class TransactionProcessor:
         Returns:
             Dict with deductible_amount, note, and calculation details
         """
-        from datetime import datetime, date
+        from datetime import datetime, timezone, date
 
         # Parse settlement date
         settlement_date = None

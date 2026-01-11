@@ -19,21 +19,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Add capital_treatment to flagcategory enum."""
-    from sqlalchemy import text
-    conn = op.get_bind()
-
-    # Add new value to the flagcategory enum
-    # PostgreSQL allows adding values to enums with ALTER TYPE
-    conn.execute(text(
-        "ALTER TYPE flagcategory ADD VALUE IF NOT EXISTS 'capital_treatment'"
-    ))
+    # Enum value now included in initial_schema migration - no-op
+    pass
 
 
 def downgrade() -> None:
-    """Remove capital_treatment from flagcategory enum.
-
-    Note: PostgreSQL doesn't support removing enum values easily.
-    This would require recreating the type, which is complex.
-    """
+    # No-op
     pass

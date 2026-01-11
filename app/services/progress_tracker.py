@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import AsyncGenerator, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ class ProgressEvent:
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.utcnow().isoformat()
+            self.timestamp = datetime.now(timezone.utc).isoformat()
 
     def to_sse(self) -> str:
         """Format as SSE data."""

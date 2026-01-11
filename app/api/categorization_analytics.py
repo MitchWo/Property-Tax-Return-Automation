@@ -1,10 +1,13 @@
 """API endpoints for categorization analytics and auditing."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,13 +15,6 @@ from app.database import get_db
 from app.models.db_models import Transaction, PLRowMapping, TaxReturn
 
 router = APIRouter(prefix="/api/categorization", tags=["categorization"])
-
-# Add web router for UI pages
-from fastapi import Request
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
-from zoneinfo import ZoneInfo
-
 web_router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
@@ -305,7 +301,7 @@ async def get_categorization_audit_report(
     return {
         'tax_return_id': str(tax_return_id),
         'property_address': analytics['property_address'],
-        'generated_at': datetime.utcnow().isoformat(),
+        'generated_at': datetime.now(timezone.utc).isoformat(),
         'summary': {
             'total_transactions': sum(s['count'] for s in analytics['analytics']['source_breakdown'].values()),
             'categorization_sources': analytics['analytics']['source_breakdown'],

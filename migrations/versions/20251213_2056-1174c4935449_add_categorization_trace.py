@@ -20,15 +20,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add categorization_trace column to transactions table
-    op.add_column('transactions',
-        sa.Column('categorization_trace',
-                  postgresql.JSONB(astext_type=sa.Text()),
-                  nullable=True,
-                  comment='Stores the decision trace from categorization layers (yaml, learned, claude)')
-    )
+    # Column now included in initial_schema migration - no-op
+    pass
 
 
 def downgrade() -> None:
-    # Remove categorization_trace column from transactions table
-    op.drop_column('transactions', 'categorization_trace')
+    # No-op - handled by initial_schema
+    pass

@@ -1,6 +1,6 @@
 """Helper for building categorization trace during transaction processing."""
-from datetime import datetime
-from typing import Any, Dict
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
 
 class CategorizationTrace:
@@ -18,11 +18,11 @@ class CategorizationTrace:
             },
             "decision": None,
             "decided_by": None,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
-    def record_context_match(self, matched: bool, category: str = None,
-                             confidence: float = 0, reason: str = None):
+    def record_context_match(self, matched: bool, category: Optional[str] = None,
+                             confidence: float = 0, reason: Optional[str] = None):
         """Record document context matching result (e.g., loan account, owner name)."""
         self.trace["layers"]["context"] = {
             "matched": matched,
@@ -34,8 +34,8 @@ class CategorizationTrace:
             self.trace["decision"] = category
             self.trace["decided_by"] = "document_context"
 
-    def record_yaml_match(self, matched: bool, category: str = None,
-                          confidence: float = 0, pattern: str = None):
+    def record_yaml_match(self, matched: bool, category: Optional[str] = None,
+                          confidence: float = 0, pattern: Optional[str] = None):
         """Record YAML pattern matching result."""
         self.trace["layers"]["yaml"] = {
             "matched": matched,
@@ -47,7 +47,7 @@ class CategorizationTrace:
             self.trace["decision"] = category
             self.trace["decided_by"] = "yaml_pattern"
 
-    def record_learned_match(self, matched: bool, category: str = None,
+    def record_learned_match(self, matched: bool, category: Optional[str] = None,
                              confidence: float = 0, times_used: int = 0):
         """Record learned pattern matching result."""
         self.trace["layers"]["learned"] = {
@@ -63,9 +63,9 @@ class CategorizationTrace:
     def record_rag_match(
         self,
         matched: bool,
-        category: str = None,
+        category: Optional[str] = None,
         confidence: float = 0,
-        learning_title: str = None,
+        learning_title: Optional[str] = None,
         learnings_found: int = 0
     ):
         """Record RAG learning search result."""
@@ -81,7 +81,7 @@ class CategorizationTrace:
             self.trace["decided_by"] = "rag_learning"
 
     def record_claude_result(self, category: str, confidence: float,
-                             reasoning: str = None):
+                             reasoning: Optional[str] = None):
         """Record Claude AI categorization result."""
         self.trace["layers"]["claude"] = {
             "category": category,

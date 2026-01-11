@@ -3,6 +3,7 @@ version: '3.8'
 services:
   db:
     image: postgres:16-alpine
+    restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -19,23 +20,35 @@ services:
 
   app:
     build: .
+    restart: always
     ports:
       - "8000:8000"
     environment:
+      # Database (uses internal Docker network)
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/property_tax
+      # API Keys (from .env file)
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      PINECONE_API_KEY: ${PINECONE_API_KEY}
+      PINECONE_INDEX_HOST: ${PINECONE_INDEX_HOST}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      # Application settings
       UPLOAD_DIR: /app/uploads
-      CLAUDE_MODEL: claude-opus-4-5-20251101  # Using Claude Opus 4.5 for best accuracy
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-opus-4-5-20251101}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Processing settings
+      ENABLE_BATCH_PROCESSING: ${ENABLE_BATCH_PROCESSING:-true}
+      ENABLE_TOOL_USE: ${ENABLE_TOOL_USE:-true}
+      ENABLE_EXTRACTION_VERIFICATION: ${ENABLE_EXTRACTION_VERIFICATION:-true}
     volumes:
       - ./uploads:/app/uploads
-      - ./.env:/app/.env
     depends_on:
       db:
         condition: service_healthy
     command: >
       sh -c "
         alembic upgrade head &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+        uvicorn app.main:app --host 0.0.0.0 --port 8000
       "
 
 volumes:

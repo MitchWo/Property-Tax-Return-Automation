@@ -13,14 +13,15 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '38b939fd17f9'
-down_revision: Union[str, None] = None
+down_revision: Union[str, None] = 'aec6e527475d'  # Depends on phase3 tables
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add 'not_sure' value to propertytype enum
-    op.execute("ALTER TYPE propertytype ADD VALUE IF NOT EXISTS 'not_sure'")
+    # 'not_sure' is now included in initial_schema migration
+    # This is a no-op for fresh installs
+    pass
 
 
 def downgrade() -> None:

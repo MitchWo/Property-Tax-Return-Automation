@@ -5,7 +5,7 @@ embeddings and Pinecone infrastructure to provide context-aware AI responses.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -111,7 +111,7 @@ class SkillLearningService:
                         'applies_to': applies_to.value,
                         'client_id': str(client_id) if client_id else 'global',
                         'category_code': category_code,
-                        'created_at': datetime.utcnow().isoformat(),
+                        'created_at': datetime.now(timezone.utc).isoformat(),
                         'created_by': created_by,
                         'learning_id': str(learning.id)
                     }
@@ -318,7 +318,7 @@ This transaction should be categorized as '{corrected_category}' based on user f
                         success_rate = learning.times_confirmed / learning.times_applied
                         learning.confidence = min(0.95, success_rate)
 
-                learning.updated_at = datetime.utcnow()
+                learning.updated_at = datetime.now(timezone.utc)
                 await self.db.commit()
 
         except Exception as e:

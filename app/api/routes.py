@@ -59,7 +59,6 @@ def format_currency(value):
 # Custom Jinja2 filter for NZ timezone datetime formatting
 def format_nz_datetime(value, fmt='%d %b %Y %H:%M'):
     """Format a datetime in NZ timezone."""
-    from datetime import datetime
     from zoneinfo import ZoneInfo
 
     if value is None:
@@ -211,7 +210,7 @@ async def delete_tax_return(tax_return_id: UUID, db: AsyncSession = Depends(get_
     import os
     from app.models.db_models import (
         TaxReturnWorkings, TransactionSummary, DocumentInventoryRecord,
-        DocumentRequest, ClientQuestion, WorkingsFlag
+        DocumentRequest, ClientQuestion
     )
 
     # Check if tax return exists

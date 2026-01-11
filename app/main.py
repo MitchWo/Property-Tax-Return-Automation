@@ -1,14 +1,20 @@
 """Main FastAPI application entry point."""
 
 import logging
+from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import api_router, web_router
+from app.api.transaction_routes import transaction_router, transaction_web_router
+from app.api.categorization_analytics import router as categorization_router, web_router as categorization_web_router
+from app.api.skill_learning_routes import router as skill_learning_router
+from app.api.workings_routes import router as workings_router
 from app.config import settings
-from app.database import init_db
+from app.database import init_db, AsyncSessionLocal
+from app.services.seed_data import seed_all
 
 # Configure structured logging
 structlog.configure(
@@ -35,12 +41,36 @@ logging.basicConfig(
 )
 logger = structlog.get_logger()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events."""
+    # Startup
+    logger.info("Starting Property Tax Agent application")
+    await init_db()
+    logger.info("Database initialized")
+
+    # Seed initial data for Phase 2 (Transaction Processing & Learning)
+    async with AsyncSessionLocal() as db:
+        try:
+            results = await seed_all(db)
+            logger.info(f"Seed data loaded: {results}")
+        except Exception as e:
+            logger.warning(f"Seed data may already exist: {e}")
+
+    yield
+
+    # Shutdown
+    logger.info("Shutting down Property Tax Agent application")
+
+
 # Create FastAPI app
 app = FastAPI(
     title="NZ Property Tax Document Review",
     description="Document review system for NZ rental property tax returns",
     version="1.0.0",
     debug=settings.DEBUG,
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
@@ -53,11 +83,6 @@ app.add_middleware(
 )
 
 # Include routers
-from app.api.transaction_routes import transaction_router, transaction_web_router
-from app.api.categorization_analytics import router as categorization_router, web_router as categorization_web_router
-from app.api.skill_learning_routes import router as skill_learning_router
-from app.api.workings_routes import router as workings_router
-
 app.include_router(api_router)
 app.include_router(web_router)
 app.include_router(transaction_router)
@@ -69,31 +94,6 @@ app.include_router(workings_router)
 
 # Mount static files if needed
 # app.mount("/static", StaticFiles(directory="app/static"), name="static")
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database on startup."""
-    logger.info("Starting Property Tax Agent application")
-    await init_db()
-    logger.info("Database initialized")
-
-    # Seed initial data for Phase 2 (Transaction Processing & Learning)
-    from app.services.seed_data import seed_all
-    from app.database import AsyncSessionLocal
-
-    async with AsyncSessionLocal() as db:
-        try:
-            results = await seed_all(db)
-            logger.info(f"Seed data loaded: {results}")
-        except Exception as e:
-            logger.warning(f"Seed data may already exist: {e}")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    logger.info("Shutting down Property Tax Agent application")
 
 
 @app.get("/health")

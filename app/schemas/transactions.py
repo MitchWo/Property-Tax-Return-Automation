@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 # Enums
@@ -43,8 +43,7 @@ class PLRowMappingResponse(PLRowMappingBase):
     """Schema for P&L row mapping response."""
     id: UUID
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Transactions
@@ -122,8 +121,7 @@ class TransactionResponse(TransactionBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MatchingTransactionInfo(BaseModel):
@@ -135,8 +133,7 @@ class MatchingTransactionInfo(BaseModel):
     amount: Decimal
     current_category: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TransactionUpdateResponse(BaseModel):
@@ -200,8 +197,7 @@ class TransactionSummaryResponse(BaseModel):
 
         return cls(**data)
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Transaction Patterns
@@ -232,8 +228,7 @@ class TransactionPatternResponse(TransactionPatternBase):
     created_at: datetime
     last_used_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Category Feedback
@@ -258,8 +253,7 @@ class CategoryFeedbackResponse(BaseModel):
     pattern_created: bool
     pattern_id: Optional[UUID] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Processing Result

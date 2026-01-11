@@ -2,7 +2,7 @@
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -28,6 +28,11 @@ from app.database import Base
 def local_now():
     """Return current time in local timezone."""
     return datetime.now().astimezone()
+
+
+def utc_now():
+    """Return current time in UTC timezone."""
+    return datetime.now(timezone.utc)
 
 
 class PropertyType(str, enum.Enum):
@@ -167,7 +172,7 @@ class TaxRule(Base):
     effective_from = Column(Date, nullable=True)
     effective_to = Column(Date, nullable=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
 
     __table_args__ = (
         Index('ix_tax_rules_lookup', 'rule_type', 'tax_year', 'property_type'),
@@ -228,13 +233,13 @@ class Transaction(Base):
     review_reason = Column(Text, nullable=True)  # Changed from String(255) to Text to handle longer Claude responses
     manually_reviewed = Column(Boolean, default=False)
     reviewed_by = Column(String(100), nullable=True)
-    reviewed_at = Column(DateTime, nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
     # Original data (for audit)
     raw_data = Column(JSONB, nullable=True)  # Original row from CSV/extraction
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
     # Relationships
     tax_return = relationship("TaxReturn", back_populates="transactions")
@@ -266,8 +271,8 @@ class TransactionSummary(Base):
     # For interest specifically
     monthly_breakdown = Column(JSONB, nullable=True)  # {"Apr-24": 1234.56, "May-24": 1234.56, ...}
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
     # Relationships
     tax_return = relationship("TaxReturn")
@@ -304,8 +309,8 @@ class TransactionPattern(Base):
 
     # Metadata
     source = Column(String(50), default='user_correction')  # 'user_correction', 'seed_data', 'bulk_import'
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     client = relationship("Client")
@@ -328,7 +333,7 @@ class CategoryFeedback(Base):
     corrected_category = Column(String(50), nullable=False)
 
     corrected_by = Column(String(100), nullable=True)
-    corrected_at = Column(DateTime, default=datetime.utcnow)
+    corrected_at = Column(DateTime(timezone=True), default=utc_now)
     notes = Column(Text, nullable=True)
 
     # Whether this created/updated a pattern

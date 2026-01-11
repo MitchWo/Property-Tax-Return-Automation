@@ -336,7 +336,7 @@ async def confirm_transaction(
     This marks the transaction as reviewed without changing its category.
     Useful when the AI's suggestion is correct and user wants to approve it.
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     result = await db.execute(
         select(Transaction).where(Transaction.id == transaction_id)
@@ -349,7 +349,7 @@ async def confirm_transaction(
     # Mark as reviewed without changing category
     txn.needs_review = False
     txn.manually_reviewed = True
-    txn.reviewed_at = datetime.utcnow()
+    txn.reviewed_at = datetime.now(timezone.utc)
     txn.review_reason = None  # Clear the review reason since it's been confirmed
 
     await db.commit()
@@ -376,7 +376,7 @@ async def bulk_confirm_transactions(
 
     Marks all specified transactions as reviewed without changing their categories.
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     confirmed_count = 0
 
@@ -389,7 +389,7 @@ async def bulk_confirm_transactions(
         if txn:
             txn.needs_review = False
             txn.manually_reviewed = True
-            txn.reviewed_at = datetime.utcnow()
+            txn.reviewed_at = datetime.now(timezone.utc)
             txn.review_reason = None
             confirmed_count += 1
 
